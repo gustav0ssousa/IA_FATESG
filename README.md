@@ -23,5 +23,5 @@ Os diretórios deste repositório contêm anotações de aula, configurações d
 
 Acompanhe meus estudos e publicações, onde compartilho conteúdos focados em Inteligência Artificial e Redes de Computadores:
 
-* **Instagram Profissional:** [@sousa.dev](https://instagram.com/sousa_dev)
+* **Instagram Profissional:** [@sousa.dev](https://instagram.com/sousa.dev)
 * **LinkedIn:** [Gustavo Sousa](https://www.linkedin.com/in/gustavo-silva-6b5308188/)
