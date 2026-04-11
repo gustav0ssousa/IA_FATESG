@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="FinDash — Dashboard Financeiro Pessoal com banco de dados, transações recorrentes e resumo anual.">
+  <title>FinDash — Dashboard Financeiro Pessoal</title>
+  <link rel="stylesheet" href="styles.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+</head>
+<body>
+
+  <!-- MIGRATION BANNER -->
+  <div class="migration-banner" id="migration-banner" style="display:none">
+    <span>📦 Dados encontrados no navegador. Deseja migrar para o banco de dados?</span>
+    <div class="migration-actions">
+      <button class="btn-primary btn-sm" id="btn-migrate">Migrar</button>
+      <button class="btn-secondary btn-sm" id="btn-dismiss-migrate">Descartar</button>
+    </div>
+  </div>
+
+  <!-- HEADER -->
+  <header class="header">
+    <div class="header-inner">
+      <div class="logo">
+        <div class="logo-icon">💰</div>
+        <span class="logo-text">FinDash</span>
+      </div>
+      <div class="month-nav" id="month-nav-container">
+        <button id="prev-month" title="Mês anterior">◀</button>
+        <span class="month-label" id="month-label">Abril 2026</span>
+        <button id="next-month" title="Próximo mês">▶</button>
+      </div>
+      <div class="year-nav" id="year-nav-container" style="display:none">
+        <button id="prev-year">◀</button>
+        <span class="month-label" id="year-label">2026</span>
+        <button id="next-year">▶</button>
+      </div>
+      <div class="header-tabs">
+        <button class="tab-btn active" data-tab="dashboard" id="tab-dashboard-btn">📊 Dashboard</button>
+        <button class="tab-btn" data-tab="transactions" id="tab-transactions-btn">📝 Transações</button>
+        <button class="tab-btn" data-tab="annual" id="tab-annual-btn">📅 Anual</button>
+      </div>
+    </div>
+  </header>
+
+  <!-- MAIN CONTENT -->
+  <main class="main-content">
+
+    <!-- TAB: DASHBOARD -->
+    <div class="tab-content active" id="tab-dashboard">
+      <section class="kpi-grid" id="kpi-grid">
+        <div class="kpi-card saldo animate-in">
+          <div class="kpi-header"><div class="kpi-icon">💰</div></div>
+          <div class="kpi-label">Saldo Mensal</div>
+          <div class="kpi-value" id="kpi-saldo">R$ 0,00</div>
+        </div>
+        <div class="kpi-card receitas animate-in">
+          <div class="kpi-header"><div class="kpi-icon">📈</div></div>
+          <div class="kpi-label">Receitas</div>
+          <div class="kpi-value" id="kpi-receitas">R$ 0,00</div>
+        </div>
+        <div class="kpi-card despesas animate-in">
+          <div class="kpi-header"><div class="kpi-icon">📉</div></div>
+          <div class="kpi-label">Despesas</div>
+          <div class="kpi-value" id="kpi-despesas">R$ 0,00</div>
+        </div>
+        <div class="kpi-card economia animate-in">
+          <div class="kpi-header"><div class="kpi-icon">🏦</div></div>
+          <div class="kpi-label">Economia</div>
+          <div class="kpi-value" id="kpi-economia">0%</div>
+        </div>
+        <div class="kpi-card investimentos animate-in">
+          <div class="kpi-header"><div class="kpi-icon">💎</div></div>
+          <div class="kpi-label">Investimentos</div>
+          <div class="kpi-value" id="kpi-investimentos">R$ 0,00</div>
+        </div>
+        <div class="kpi-card saude animate-in">
+          <div class="kpi-header"><div class="kpi-icon">❤️</div></div>
+          <div class="kpi-label">Saúde Financeira</div>
+          <div class="kpi-value" id="kpi-saude">—</div>
+          <div class="health-badge" id="health-badge">Sem dados</div>
+        </div>
+      </section>
+
+      <section class="charts-grid">
+        <div class="chart-card animate-in">
+          <div class="chart-card-header">
+            <div><div class="chart-title">Gastos por Categoria</div><div class="chart-subtitle">Distribuição das despesas</div></div>
+          </div>
+          <div class="chart-container" id="category-chart-container"><canvas id="category-chart"></canvas></div>
+        </div>
+        <div class="chart-card animate-in">
+          <div class="chart-card-header">
+            <div><div class="chart-title">Evolução do Saldo</div><div class="chart-subtitle">Saldo acumulado ao longo do mês</div></div>
+          </div>
+          <div class="chart-container" id="balance-chart-container"><canvas id="balance-chart"></canvas></div>
+        </div>
+        <div class="chart-card animate-in">
+          <div class="chart-card-header">
+            <div><div class="chart-title">Receitas vs Despesas</div><div class="chart-subtitle">Comparação dos últimos meses</div></div>
+          </div>
+          <div class="chart-container" id="comparison-chart-container"><canvas id="comparison-chart"></canvas></div>
+        </div>
+        <div class="goals-card animate-in">
+          <div class="goals-header">
+            <div><div class="chart-title">Metas de Gastos</div><div class="chart-subtitle">Acompanhe seus limites</div></div>
+            <button class="btn-secondary" id="btn-set-goals">⚙️ Definir</button>
+          </div>
+          <div class="goals-list" id="goals-list">
+            <div class="goals-empty"><div class="goals-empty-icon">🎯</div><div>Defina metas para acompanhar seus gastos</div></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="transactions-section">
+        <div class="section-header">
+          <div class="section-title">📋 Últimas Transações</div>
+          <button class="btn-primary" id="btn-add-from-dashboard">+ Nova Transação</button>
+        </div>
+        <div class="table-wrapper">
+          <table>
+            <thead><tr><th>Data</th><th>Descrição</th><th>Categoria</th><th>Tipo</th><th>Valor</th></tr></thead>
+            <tbody id="recent-transactions-body">
+              <tr><td colspan="5"><div class="empty-state"><div class="empty-state-icon">📭</div><div class="empty-state-text">Nenhuma transação registrada.</div></div></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+
+    <!-- TAB: TRANSAÇÕES -->
+    <div class="tab-content" id="tab-transactions">
+      <div class="transactions-section">
+        <div class="section-header">
+          <div class="section-title">📝 Todas as Transações</div>
+          <div class="data-tools">
+            <button class="btn-secondary" id="btn-recurring">🔄 Recorrentes</button>
+            <button class="btn-secondary" id="btn-export">📤 Exportar</button>
+            <button class="btn-secondary" id="btn-import">📥 Importar</button>
+            <button class="btn-primary" id="btn-add-transaction">+ Nova Transação</button>
+            <input type="file" id="import-file" accept=".json" style="display:none">
+          </div>
+        </div>
+        <div class="tx-toolbar">
+          <div class="search-box">
+            <span class="search-icon">🔍</span>
+            <input type="text" id="tx-search" placeholder="Buscar por descrição...">
+          </div>
+          <select class="filter-select" id="tx-filter-category"><option value="">Todas as Categorias</option></select>
+          <select class="filter-select" id="tx-filter-type">
+            <option value="">Todos os Tipos</option>
+            <option value="receita">Receitas</option>
+            <option value="despesa">Despesas</option>
+          </select>
+        </div>
+        <div class="table-wrapper">
+          <table>
+            <thead><tr><th>Data</th><th>Descrição</th><th>Categoria</th><th>Tipo</th><th>Valor</th><th>Ações</th></tr></thead>
+            <tbody id="all-transactions-body">
+              <tr><td colspan="6"><div class="empty-state"><div class="empty-state-icon">📭</div><div class="empty-state-text">Nenhuma transação encontrada.</div></div></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB: ANUAL -->
+    <div class="tab-content" id="tab-annual">
+      <section class="kpi-grid">
+        <div class="kpi-card receitas animate-in">
+          <div class="kpi-header"><div class="kpi-icon">📈</div></div>
+          <div class="kpi-label">Receitas Anuais</div>
+          <div class="kpi-value" id="annual-receitas">R$ 0,00</div>
+        </div>
+        <div class="kpi-card despesas animate-in">
+          <div class="kpi-header"><div class="kpi-icon">📉</div></div>
+          <div class="kpi-label">Despesas Anuais</div>
+          <div class="kpi-value" id="annual-despesas">R$ 0,00</div>
+        </div>
+        <div class="kpi-card saldo animate-in">
+          <div class="kpi-header"><div class="kpi-icon">💰</div></div>
+          <div class="kpi-label">Saldo Anual</div>
+          <div class="kpi-value" id="annual-saldo">R$ 0,00</div>
+        </div>
+        <div class="kpi-card economia animate-in">
+          <div class="kpi-header"><div class="kpi-icon">🏦</div></div>
+          <div class="kpi-label">Economia Média</div>
+          <div class="kpi-value" id="annual-economia">0%</div>
+        </div>
+      </section>
+
+      <section class="charts-grid">
+        <div class="chart-card animate-in">
+          <div class="chart-card-header"><div><div class="chart-title">Receitas vs Despesas Mensal</div><div class="chart-subtitle">Comparação mês a mês</div></div></div>
+          <div class="chart-container" id="annual-bar-container"><canvas id="annual-bar-chart"></canvas></div>
+        </div>
+        <div class="chart-card animate-in">
+          <div class="chart-card-header"><div><div class="chart-title">Saldo Acumulado</div><div class="chart-subtitle">Evolução ao longo do ano</div></div></div>
+          <div class="chart-container" id="annual-balance-container"><canvas id="annual-balance-chart"></canvas></div>
+        </div>
+        <div class="chart-card animate-in">
+          <div class="chart-card-header"><div><div class="chart-title">Top 5 Categorias de Despesa</div><div class="chart-subtitle">Maiores gastos do ano</div></div></div>
+          <div class="chart-container" id="annual-top-container"><canvas id="annual-top-chart"></canvas></div>
+        </div>
+        <div class="chart-card animate-in">
+          <div class="chart-card-header"><div><div class="chart-title">Tendência de Economia</div><div class="chart-subtitle">% economizado por mês</div></div></div>
+          <div class="chart-container" id="annual-economy-container"><canvas id="annual-economy-chart"></canvas></div>
+        </div>
+      </section>
+
+      <section class="transactions-section">
+        <div class="section-header"><div class="section-title">📊 Resumo Mensal</div></div>
+        <div class="table-wrapper">
+          <table>
+            <thead><tr><th>Mês</th><th>Receitas</th><th>Despesas</th><th>Saldo</th><th>Economia</th></tr></thead>
+            <tbody id="annual-summary-body"></tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <!-- TRANSACTION MODAL -->
+  <div class="modal-overlay" id="transaction-modal">
+    <div class="modal">
+      <div class="modal-header">
+        <div class="modal-title" id="modal-tx-title">Nova Transação</div>
+        <button class="modal-close" id="modal-tx-close">✕</button>
+      </div>
+      <form id="transaction-form">
+        <div class="modal-body">
+          <div class="form-group"><label for="tx-date">Data</label><input type="date" id="tx-date" required></div>
+          <div class="form-group"><label for="tx-description">Descrição</label><input type="text" id="tx-description" placeholder="Ex: Supermercado, Freelance..." required></div>
+          <div class="form-row">
+            <div class="form-group"><label for="tx-category">Categoria</label><select id="tx-category" required><option value="">Selecione...</option></select></div>
+            <div class="form-group"><label for="tx-type">Tipo</label><select id="tx-type" required><option value="despesa">📉 Despesa</option><option value="receita">📈 Receita</option></select></div>
+          </div>
+          <div class="form-group"><label for="tx-value">Valor (R$)</label><input type="number" id="tx-value" step="0.01" min="0.01" placeholder="0,00" required></div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn-secondary" id="modal-tx-cancel">Cancelar</button>
+          <button type="submit" class="btn-primary">💾 Salvar</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- GOALS MODAL -->
+  <div class="modal-overlay" id="goals-modal">
+    <div class="modal">
+      <div class="modal-header">
+        <div class="modal-title">🎯 Metas de Gastos por Categoria</div>
+        <button class="modal-close" id="modal-goals-close">✕</button>
+      </div>
+      <div class="modal-body" id="goals-form-body"></div>
+      <div class="modal-footer">
+        <button type="button" class="btn-secondary" id="modal-goals-cancel">Cancelar</button>
+        <button type="button" class="btn-primary" id="modal-goals-save">💾 Salvar Metas</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- RECURRING LIST MODAL -->
+  <div class="modal-overlay" id="recurring-modal">
+    <div class="modal" style="max-width:600px">
+      <div class="modal-header">
+        <div class="modal-title">🔄 Transações Recorrentes</div>
+        <button class="modal-close" id="modal-recurring-close">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="recurring-toolbar">
+          <button class="btn-primary btn-sm" id="btn-add-recurring">+ Adicionar</button>
+          <button class="btn-secondary btn-sm" id="btn-generate-recurring">⚡ Gerar para este mês</button>
+        </div>
+        <div id="recurring-list"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- RECURRING FORM MODAL -->
+  <div class="modal-overlay" id="recurring-form-modal">
+    <div class="modal">
+      <div class="modal-header">
+        <div class="modal-title" id="modal-rec-form-title">Nova Recorrente</div>
+        <button class="modal-close" id="modal-rec-form-close">✕</button>
+      </div>
+      <form id="recurring-form">
+        <div class="modal-body">
+          <div class="form-group"><label for="rec-description">Descrição</label><input type="text" id="rec-description" placeholder="Ex: Salário, Aluguel..." required></div>
+          <div class="form-row">
+            <div class="form-group"><label for="rec-category">Categoria</label><select id="rec-category" required><option value="">Selecione...</option></select></div>
+            <div class="form-group"><label for="rec-type">Tipo</label><select id="rec-type" required><option value="despesa">📉 Despesa</option><option value="receita">📈 Receita</option></select></div>
+          </div>
+          <div class="form-row">
+            <div class="form-group"><label for="rec-value">Valor (R$)</label><input type="number" id="rec-value" step="0.01" min="0.01" required></div>
+            <div class="form-group"><label for="rec-day">Dia do Mês</label><input type="number" id="rec-day" min="1" max="31" value="1" required></div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn-secondary" id="modal-rec-form-cancel">Cancelar</button>
+          <button type="submit" class="btn-primary">💾 Salvar</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- TOAST CONTAINER -->
+  <div class="toast-container" id="toast-container"></div>
+
+  <script src="app.js"></script>
+</body>
+</html>
