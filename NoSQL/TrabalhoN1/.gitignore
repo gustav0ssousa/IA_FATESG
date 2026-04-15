@@ -1,0 +1,11 @@
+# Python
+.venv/
+__pycache__/
+*.pyc
+
+# Dados massivos
+*.jsonl
+
+# Temporários
+*.txt
+!requirements.txt
