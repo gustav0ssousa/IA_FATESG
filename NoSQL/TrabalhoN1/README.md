@@ -196,22 +196,32 @@ Script de tratamento e limpeza otimizado para dados massivos. Processa **~16M de
 
 ## 📥 Importação — `src/import_json.py`
 
-Importa os arquivos JSONL limpos (`data/clean/`) para as coleções MongoDB.
+Importa os arquivos JSONL limpos (`data/clean/`) para as coleções MongoDB. Otimizado para velocidade máxima.
+
+### Estratégia
+
+- **`insert_many`** com `ordered=False` — sem overhead de upsert (dados já deduplicados)
+- **Batch de 5.000 docs** — reduz round-trips ao MongoDB
+- **Drop + reimport** — garante coleção limpa, sem dados stale
+- **Sem campo `id` artificial** — usa apenas o `_id` nativo do MongoDB
+- **Criação automática de índices** nos campos-chave após importação
+
+### Configuração
 
 | Parâmetro    | Valor Padrão                   | Descrição                          |
-|-------------|-------------------------------|------------------------------------|
+|-------------|-------------------------------|--------------------------------------|
 | `MONGO_URI`  | `mongodb://localhost:27017/`  | URI de conexão (env var)           |
 | `DB_NAME`    | `DB_Producao_Artistica`       | Nome do banco (env var)            |
-| `BATCH_SIZE` | `1000`                        | Documentos por lote de escrita     |
-| `UPSERT`     | `True`                        | Atualiza se já existir             |
+| `BATCH_SIZE` | `5000`                        | Documentos por lote de inserção    |
 
 ### Coleções Geradas
 
-| Arquivo de Entrada          | Coleção MongoDB  |
-|----------------------------|------------------|
-| `pessoa_clean.jsonl`        | `pessoa`         |
-| `producao_clean.jsonl`      | `producao`       |
-| `equipe_clean.jsonl`        | `equipe`         |
+| Arquivo de Entrada          | Coleção MongoDB    | Índice Criado                   |
+|----------------------------|--------------------|---------------------------------|
+| `pessoa_clean.jsonl`        | `pessoa_clean`     | `id_pessoa` (unique)            |
+| `producao_clean.jsonl`      | `producao_clean`   | `id_producao` (unique)          |
+| `equipe_clean.jsonl`        | `equipe_clean`     | `(id_producao, id_pessoa)` composto |
+
 
 ---
 
