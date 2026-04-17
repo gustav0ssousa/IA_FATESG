@@ -291,6 +291,10 @@ Importa os arquivos JSONL limpos (`data/clean/`) para as coleções MongoDB. Oti
 ## 👤 Autores
 
 **Gustavo Sousa** — FATESG · Inteligência Artificial
+
 **Vitória Magalhães** — FATESG · Inteligência Artificial
+
 **Melissa Cunha** — FATESG · Inteligência Artificial
+
 **Karem Lemes** — FATESG · Inteligência Artificial
+
