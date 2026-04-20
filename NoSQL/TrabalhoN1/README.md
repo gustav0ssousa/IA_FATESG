@@ -24,7 +24,9 @@ TraballhoN1/
 │   └── docker-compose.yml       # MongoDB 7 containerizado
 ├── src/
 │   ├── clean_data.py            # Script de limpeza e tratamento
-│   └── import_json.py           # Script de importação para MongoDB
+│   ├── import_json.py           # Script de importação para MongoDB
+│   ├── spark_pipeline.py        # Pipeline distribuído Apache Spark
+│   └── app.py                   # Dashboard Web interativo em Streamlit
 ├── data/                        # Dados brutos (JSONL) — gitignored
 │   ├── pessoa.jsonl             #   ~90 MB  ·  2.062.495 registros
 │   ├── producao.jsonl           #   ~75 MB  ·  1.023.616 registros
@@ -112,6 +114,7 @@ O MongoDB estará disponível em `localhost:27017`.
 
 ### 3. Executar o Pipeline
 
+**Abordagem 1: Pipeline Python Nativo (Padrão)**
 ```bash
 # Passo 1: Limpar e tratar os dados brutos
 python src/clean_data.py
@@ -120,7 +123,24 @@ python src/clean_data.py
 python src/import_json.py
 ```
 
-### 4. Parar o MongoDB
+**Abordagem 2: Pipeline Apache Spark (Alta escalabilidade)**
+```bash
+# Limpar e tratar os dados usando DataFrames distribuídos
+python src/spark_pipeline.py
+```
+*(A rotina do Spark processa e valida todo o dataset, salvando os resultados tratados na pasta `data/clean_spark/`)*
+
+### 4. Acessar o Dashboard (Streamlit)
+
+Com os dados carregados no MongoDB, explore as agregações e dados interativamente:
+
+```bash
+# Iniciar a interface Web do Streamlit
+streamlit run src/app.py
+```
+*(O dashboard abrirá no seu navegador, localizado em `http://localhost:8501`)*
+
+### 5. Parar o MongoDB
 
 ```bash
 # Parar o container (dados persistem no volume)
@@ -155,6 +175,20 @@ MONGO_URI="mongodb://user:pass@host:27017/" python src/import_json.py
 # Alterar o nome do banco
 DB_NAME="outro_banco" python src/import_json.py
 ```
+
+---
+
+## ⚡ Pipeline via Apache Spark — `src/spark_pipeline.py`
+
+Em complemento ao script em Python nativo, este projeto conta com uma implementação completa de ETL via **PySpark** (`src/spark_pipeline.py`), demonstrando como escalar massivamente o tratamento de dados. 
+
+O script tira proveito do processamento em memória e dos clusters distribuídos do Spark para tratar os dados brutos e garantir integridade referencial.
+
+**Destaques da Implementação Spark:**
+- Aproveita bibliotecas baseadas em **DataFrames** (`pyspark.sql`).
+- Aplica um **Semi Join (`leftsemi`)** para remover as chaves de **Equipe** com IDs órfãos (ligações com produções ou pessoas inexistentes), mantendo a integridade.
+- Resolve a tipagem e cast numérico nativamente utilizando `when()` e `IntegerType()`.
+- Gera saídas formatadas com `.coalesce(1)` para os datasets de `pessoa`, `producao` e `equipe` diretamente no subdiretório `data/clean_spark/`.
 
 ---
 
@@ -247,11 +281,20 @@ Importa os arquivos JSONL limpos (`data/clean/`) para as coleções MongoDB. Oti
 | MongoDB 7        | Banco de dados NoSQL                 |
 | Docker Compose   | Containerização do MongoDB           |
 | PyMongo          | Driver MongoDB para Python           |
+| Apache Spark     | Processamento de Dados Massivos (ETL)|
+| Streamlit        | Dashboard interativo e relatórios Web|
 | JSON Lines       | Formato dos dados de entrada (.jsonl)|
 | venv             | Isolamento de dependências Python    |
 
 ---
 
-## 👤 Autor
+## 👤 Autores
 
 **Gustavo Sousa** — FATESG · Inteligência Artificial
+
+**Vitória Magalhães** — FATESG · Inteligência Artificial
+
+**Melissa Cunha** — FATESG · Inteligência Artificial
+
+**Karem Lemes** — FATESG · Inteligência Artificial
+
