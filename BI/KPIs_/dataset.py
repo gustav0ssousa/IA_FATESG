@@ -9,12 +9,12 @@ csv = r"C:\pr0jetos\IA_FATESG\BI\KPIs_\consulta.csv"
 # Carregamento dos dados
 data = pd.read_csv(csv, sep=";")
 
-# Os valores de texto das métricas (ex: "3.983") precisam ser formatados para numérico.
+
 anos = [str(ano) for ano in range(2014, 2025)]
 for ano in anos:
     data[ano] = data[ano].astype(str).str.replace('.', '', regex=False).astype(float)
 
-# Separar os dados em DataFrames distintos para cruzamento
+
 df_docentes = data[data['Variável'] == 'Docentes - Total (número)'].drop(columns=['Variável'])
 df_salas = data[data['Variável'] == 'Salas de Aula Utilizadas - Total (número)'].drop(columns=['Variável'])
 
@@ -46,7 +46,6 @@ kpi_df['KPI_2_Cresc_Docentes_Percent'] = round(kpi_df.groupby('Localidade')['Doc
 kpi_df['Aux_Cresc_Salas_Percent'] = round(kpi_df.groupby('Localidade')['Salas'].pct_change() * 100, 2)
 
 # KPI 3: Descompasso de Crescimento (Crescimento de Docentes - Crescimento de Salas)
-# Valores negativos significam que estão criando mais salas do que professores para ocupá-las.
 kpi_df['KPI_3_Descompasso_Docentes_vs_Salas_Percent'] = kpi_df['KPI_2_Cresc_Docentes_Percent'] - kpi_df['Aux_Cresc_Salas_Percent']
 
 # Tratando valores NaN (primeiro ano não tem crescimento YoY)

@@ -1,3 +1,9 @@
 pymongo
 emoji
+<<<<<<< HEAD
 pyspark
+=======
+pyspark
+streamlit
+pandas
+>>>>>>> bd93b940f88aee36beddc1bad7adbf1a22d81e76
