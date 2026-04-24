@@ -222,7 +222,32 @@ Importa os arquivos JSONL limpos (`data/clean/`) para as coleções MongoDB. Oti
 | `producao_clean.jsonl`      | `producao_clean`   | `id_producao` (unique)          |
 | `equipe_clean.jsonl`        | `equipe_clean`     | `(id_producao, id_pessoa)` composto |
 
+---
 
+## ⚡ Importação via Apache Spark (Alternativa) — `src/spark_etl.py`
+
+Foi implementado um pipeline concorrente para inserir dados utilizando **PySpark e MongoDB Spark Connector**. Ideal para realizar *loads* massivos distribuindo o processamento internamente.
+
+### Pré-requisitos Específicos
+
+- O **Java** (JRE/JDK) deve estar instalado e configurado no `PATH` do seu sistema operacional para rodar a JVM do Spark.
+- Ter instalado a biblioteca base executando `pip install pyspark`. (Já incluso em `requirements.txt`)
+
+### Execução
+
+Basta certificar-se de possuir os dados tratados na pasta `data/clean` e executar:
+
+```bash
+python src/spark_etl.py
+```
+
+### Comportamento
+O script se conectará magicamente ao banco configurado, injetando uma nova leva de coleções, desta vez no padrão `_spark`:
+- `pessoa_spark`
+- `producao_spark`
+- `equipe_spark`
+
+*Isso permite comparar o desempenho da importação padrão (Python `pymongo` single-threaded com lotes manuais em `import_json.py`) com essa nova arquitetura (JVM Multithreaded com o `Spark DataFrame`).*
 ---
 
 ## 📊 Estatísticas do Dataset
