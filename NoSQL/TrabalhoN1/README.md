@@ -100,17 +100,17 @@ source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
-### 2. Subir o MongoDB via Docker
+### 2. Subir MongoDB + Streamlit via Docker
 
 ```bash
-# Iniciar o container
-docker compose -f docker/docker-compose.yml up -d
+# Iniciar os serviços
+docker compose -f docker/docker-compose.yml up -d --build
 
-# Verificar se está rodando
+# Verificar se estão rodando
 docker ps
 ```
 
-O MongoDB estará disponível em `localhost:27017`.
+O MongoDB estará disponível em `localhost:27017` e o dashboard em `http://localhost:8501`.
 
 ### 3. Executar o Pipeline
 
@@ -121,6 +121,12 @@ python src/clean_data.py
 
 # Passo 2: Importar dados limpos para o MongoDB
 python src/import_json.py
+```
+
+Para executar os scripts de `src` no mesmo ambiente Docker do projeto:
+
+```bash
+docker compose -f docker/docker-compose.yml run --rm streamlit python src/import_json.py
 ```
 
 **Abordagem 2: Pipeline Apache Spark (Alta escalabilidade)**
@@ -135,8 +141,8 @@ python src/spark_pipeline.py
 Com os dados carregados no MongoDB, explore as agregações e dados interativamente:
 
 ```bash
-# Iniciar a interface Web do Streamlit
-streamlit run src/app.py
+# Ver logs do Streamlit
+docker compose -f docker/docker-compose.yml logs -f streamlit
 ```
 *(O dashboard abrirá no seu navegador, localizado em `http://localhost:8501`)*
 
@@ -154,7 +160,7 @@ docker compose -f docker/docker-compose.yml down -v
 
 ## 🐳 Docker
 
-O MongoDB roda em container Docker via `docker-compose.yml`:
+O projeto roda em containers Docker via `docker-compose.yml`:
 
 | Configuração    | Valor                              |
 |----------------|-------------------------------------|
@@ -163,6 +169,8 @@ O MongoDB roda em container Docker via `docker-compose.yml`:
 | **Porta**       | `27017:27017`                      |
 | **Volume**      | `mongo_data` (dados persistentes)  |
 | **Database**    | `DB_Producao_Artistica`            |
+
+O serviço `streamlit` usa a imagem definida em `docker/Dockerfile`, monta `src/` e `data/` como volumes e compartilha `MONGO_URI` e `DB_NAME` com os scripts Python.
 
 ### Variáveis de Ambiente (opcionais)
 

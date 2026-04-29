@@ -1,5 +1,4 @@
 services:
-
   mongodb:
     image: mongo:7
     container_name: mongodb_producao_artistica
@@ -10,6 +9,32 @@ services:
       - mongo_data:/data/db
     environment:
       MONGO_INITDB_DATABASE: DB_Producao_Artistica
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  streamlit:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    container_name: streamlit_producao_artistica
+    restart: unless-stopped
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    working_dir: /app
+    environment:
+      MONGO_URI: mongodb://mongodb:27017/
+      DB_NAME: DB_Producao_Artistica
+    ports:
+      - "8501:8501"
+    volumes:
+      - ../src:/app/src
+      - ../data:/app/data
+    command: streamlit run src/app.py --server.address=0.0.0.0 --server.port=8501 --server.fileWatcherType=poll
 
 volumes:
   mongo_data:

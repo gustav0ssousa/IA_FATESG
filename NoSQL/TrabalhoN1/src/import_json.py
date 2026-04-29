@@ -26,7 +26,7 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
 MONGO_URI   = os.environ.get("MONGO_URI", "mongodb://localhost:27017/")
 DB_NAME     = os.environ.get("DB_NAME", "DB_Producao_Artistica")
-PASTA_DADOS = PROJECT_ROOT / "data" / "clean_spark"
+PASTA_DADOS = PROJECT_ROOT / "data" / "clean"
 BATCH_SIZE  = 5_000          # docs por insert_many (maior = mais rápido)
 LOG_INTERVAL = 100_000       # progresso a cada N docs
 

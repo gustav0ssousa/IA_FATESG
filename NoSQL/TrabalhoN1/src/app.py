@@ -24,6 +24,7 @@ st.set_page_config(
 # URI do MongoDB
 MONGO_URI = os.environ.get("MONGO_URI", "mongodb://localhost:27017/")
 DB_NAME   = os.environ.get("DB_NAME", "DB_Producao_Artistica")
+REQUIRED_COLLECTIONS = ["pessoa_clean", "producao_clean", "equipe_clean"]
 
 @st.cache_resource
 def get_db_connection():
@@ -31,11 +32,11 @@ def get_db_connection():
         client = MongoClient(MONGO_URI, serverSelectionTimeoutMS=5000)
         # Testar a conexão
         client.admin.command("ping")
-        return client[DB_NAME]
+        return client[DB_NAME], None
     except Exception as e:
-        return None
+        return None, str(e)
 
-db = get_db_connection()
+db, connection_error = get_db_connection()
 
 # ─────────────────────────── INTERFACE ───────────────────────────
 
@@ -43,10 +44,32 @@ st.title("🎬 Dashboard — DB Produção Artística")
 st.markdown("Visualização e exploração do dataset mantido no **MongoDB**.")
 
 if db is None:
-    st.error("❌ Não foi possível conectar ao MongoDB. Certifique-se de que o container está rodando na porta 27017 e os dados foram importados.")
+    st.error("❌ Não foi possível conectar ao MongoDB.")
+    if connection_error:
+        st.code(connection_error)
     st.stop()
 else:
     st.success("✅ Conectado ao MongoDB com sucesso!")
+
+available_collections = set(db.list_collection_names())
+missing_collections = [
+    collection
+    for collection in REQUIRED_COLLECTIONS
+    if collection not in available_collections
+]
+
+if missing_collections:
+    st.warning(
+        "⚠️ O MongoDB está conectado, mas o banco ainda não possui "
+        "as coleções esperadas do projeto."
+    )
+    st.write("Coleções ausentes:", ", ".join(missing_collections))
+    st.write("Importe os dados com:")
+    st.code(
+        "docker compose -f docker/docker-compose.yml exec streamlit "
+        "python src/import_json.py"
+    )
+    st.stop()
 
 st.divider()
 
