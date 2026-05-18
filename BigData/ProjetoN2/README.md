@@ -225,19 +225,3 @@ streamlit run app/streamlit_app.py
 | `streamlit` | Persistente | Dashboard interativo |
 
 ---
-
-## Limitacoes
-
-- Dataset aparentemente sintetico — pode nao representar integralmente o mundo real.
-- Ausencia de dados temporais — nao permite avaliar evolucao do burnout.
-- Variaveis clinicas removidas do baseline para evitar vazamento de dados.
-- Classes intermediarias (`High`, `Moderate`) apresentaram pior desempenho nos modelos.
-
-## Melhorias futuras
-
-- Testar Gradient Boosting, XGBoost, LightGBM ou CatBoost.
-- Ajuste de hiperparametros com validacao cruzada.
-- Cenario clinico-operacional incluindo `stress_score`, `phq9_score` e `gad7_score`.
-- Auditoria de fairness por `gender`, `country` e faixa etaria.
-- Explicabilidade com SHAP.
-- Automatizacao do pipeline em CI/CD.
