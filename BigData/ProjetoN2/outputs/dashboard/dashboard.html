@@ -1,0 +1,175 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Dashboard - Saude mental em tecnologia</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f6f7f4;
+      --panel: #ffffff;
+      --text: #263238;
+      --muted: #60717a;
+      --line: #d8ded8;
+      --accent: #2f6f73;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: Arial, sans-serif;
+    }
+    header {
+      padding: 28px 32px 18px;
+      border-bottom: 1px solid var(--line);
+      background: #ffffff;
+    }
+    h1 {
+      margin: 0 0 8px;
+      font-size: 28px;
+      font-weight: 700;
+      letter-spacing: 0;
+    }
+    p {
+      margin: 0;
+      color: var(--muted);
+      line-height: 1.5;
+    }
+    main {
+      width: min(1440px, 100%);
+      margin: 0 auto;
+      padding: 24px;
+    }
+    .kpi-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 14px;
+      margin-bottom: 22px;
+    }
+    .kpi-card {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 16px;
+      min-height: 92px;
+    }
+    .kpi-card span {
+      display: block;
+      color: var(--muted);
+      font-size: 13px;
+      margin-bottom: 10px;
+    }
+    .kpi-card strong {
+      display: block;
+      font-size: 26px;
+      line-height: 1.1;
+      color: var(--accent);
+    }
+    .chart-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(520px, 1fr));
+      gap: 18px;
+    }
+    .chart-panel {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      min-height: 520px;
+      overflow: hidden;
+    }
+    iframe {
+      width: 100%;
+      height: 520px;
+      border: 0;
+      display: block;
+    }
+    @media (max-width: 720px) {
+      header { padding: 22px 18px 14px; }
+      main { padding: 16px; }
+      .chart-grid { grid-template-columns: 1fr; }
+      .chart-panel { min-height: 460px; }
+      iframe { height: 460px; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Saude mental em tecnologia - Dashboard analitico</h1>
+    <p>Indicadores visuais gerados a partir da tabela tratada no PostgreSQL.</p>
+  </header>
+  <main>
+    <section class="kpi-grid">
+      
+        <section class="kpi-card">
+            <span>Registros</span>
+            <strong>100.000</strong>
+        </section>
+        
+
+        <section class="kpi-card">
+            <span>Burnout severo</span>
+            <strong>28.58%</strong>
+        </section>
+        
+
+        <section class="kpi-card">
+            <span>Burnout alto/severo</span>
+            <strong>47.94%</strong>
+        </section>
+        
+
+        <section class="kpi-card">
+            <span>Estresse medio</span>
+            <strong>7.06</strong>
+        </section>
+        
+
+        <section class="kpi-card">
+            <span>Horas semanais</span>
+            <strong>47.10</strong>
+        </section>
+        
+
+        <section class="kpi-card">
+            <span>Usa terapia</span>
+            <strong>15.19%</strong>
+        </section>
+        
+    </section>
+    <section class="chart-grid">
+      
+        <section class="chart-panel">
+            <iframe src="charts/01_burnout_level_distribution.html" loading="lazy"></iframe>
+        </section>
+        
+
+        <section class="chart-panel">
+            <iframe src="charts/02_stress_score_histogram.html" loading="lazy"></iframe>
+        </section>
+        
+
+        <section class="chart-panel">
+            <iframe src="charts/03_burnout_by_work_mode_boxplot.html" loading="lazy"></iframe>
+        </section>
+        
+
+        <section class="chart-panel">
+            <iframe src="charts/04_stress_vs_burnout_scatter.html" loading="lazy"></iframe>
+        </section>
+        
+
+        <section class="chart-panel">
+            <iframe src="charts/05_correlation_heatmap.html" loading="lazy"></iframe>
+        </section>
+        
+
+        <section class="chart-panel">
+            <iframe src="charts/06_work_mode_kpis.html" loading="lazy"></iframe>
+        </section>
+        
+    </section>
+  </main>
+</body>
+</html>

@@ -1,0 +1,5 @@
+coluna,categoria,frequencia_absoluta,frequencia_relativa_pct,categorias_unicas,ranking
+burnout_level,Low,25807,25.807,4,3
+burnout_level,Moderate,26255,26.255,4,2
+burnout_level,High,19362,19.362,4,4
+burnout_level,Severe,28576,28.576,4,1

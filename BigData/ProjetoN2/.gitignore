@@ -1,0 +1,7 @@
+data/*.sqlite
+postgres_data/
+.env
+.venv/
+__pycache__/
+.pytest_cache/
+docs/sprints

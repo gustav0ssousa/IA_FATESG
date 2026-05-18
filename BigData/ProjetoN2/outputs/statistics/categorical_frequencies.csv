@@ -1,0 +1,64 @@
+coluna,categoria,frequencia_absoluta,frequencia_relativa_pct,categorias_unicas,ranking
+burnout_level,Severe,28576,28.576,4,1
+burnout_level,Moderate,26255,26.255,4,2
+burnout_level,Low,25807,25.807,4,3
+burnout_level,High,19362,19.362,4,4
+company_size,Mid (201-1000),25062,25.062,5,1
+company_size,Large (1001-5000),22027,22.027,5,2
+company_size,Startup (1-50),19771,19.771,5,3
+company_size,Small (51-200),18067,18.067,5,4
+company_size,Enterprise (5000+),15073,15.073,5,5
+country,USA,31966,31.966,10,1
+country,India,21998,21.998,10,2
+country,UK,9939,9.939,10,3
+country,Canada,7940,7.94,10,4
+country,Germany,7099,7.099,10,5
+country,Australia,6169,6.169,10,6
+country,Brazil,4050,4.05,10,7
+country,Netherlands,3956,3.956,10,8
+country,Singapore,3947,3.947,10,9
+country,France,2936,2.936,10,10
+gad7_category,Minimal (0-4),47532,47.532,4,1
+gad7_category,Mild (5-9),36912,36.912,4,2
+gad7_category,Moderate (10-14),14191,14.191,4,3
+gad7_category,Severe (15-21),1365,1.365,4,4
+gender,Male,65243,65.243,4,1
+gender,Female,29759,29.759,4,2
+gender,Non-binary,3994,3.994,4,3
+gender,Prefer not to say,1004,1.004,4,4
+industry,SaaS / Cloud,19957,19.957,10,1
+industry,Fintech,15064,15.064,10,2
+industry,E-commerce,12057,12.057,10,3
+industry,AI / ML Startup,11957,11.957,10,4
+industry,Healthcare Tech,10004,10.004,10,5
+industry,Cybersecurity,7900,7.9,10,6
+industry,Consulting,7012,7.012,10,7
+industry,Enterprise Software,6098,6.098,10,8
+industry,Gaming,5936,5.936,10,9
+industry,Social Media / AdTech,4015,4.015,10,10
+job_role,Software Engineer,20080,20.08,12,1
+job_role,Data Scientist,12029,12.029,12,2
+job_role,ML Engineer,10114,10.114,12,3
+job_role,Data Analyst,8028,8.028,12,4
+job_role,Backend Developer,7996,7.996,12,5
+job_role,Frontend Developer,7970,7.97,12,6
+job_role,Product Manager,7965,7.965,12,7
+job_role,DevOps Engineer,7949,7.949,12,8
+job_role,Full Stack Developer,6907,6.907,12,9
+job_role,Cybersecurity Engineer,4011,4.011,12,10
+job_role,Cloud Engineer,3917,3.917,12,11
+job_role,QA Engineer,3034,3.034,12,12
+phq9_category,None (0-4),40918,40.918,5,1
+phq9_category,Mild (5-9),32611,32.611,5,2
+phq9_category,Moderate (10-14),20133,20.133,5,3
+phq9_category,Moderately Severe (15-19),5773,5.773,5,4
+phq9_category,Severe (20-27),565,0.565,5,5
+seniority_level,Mid,28092,28.092,6,1
+seniority_level,Senior,24852,24.852,6,2
+seniority_level,Junior,20230,20.23,6,3
+seniority_level,Lead,11928,11.928,6,4
+seniority_level,Manager,9915,9.915,6,5
+seniority_level,Principal,4983,4.983,6,6
+work_mode,Hybrid,39856,39.856,3,1
+work_mode,Remote,34936,34.936,3,2
+work_mode,On-site,25208,25.208,3,3

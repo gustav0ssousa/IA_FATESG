@@ -1,0 +1,4 @@
+dimensao,categoria,total_registros,stress_score_medio,burnout_score_medio,satisfacao_media,equilibrio_vida_trabalho_medio,apoio_gestor_medio,horas_semanais_media,sono_medio_horas,burnout_severe_pct,burnout_high_or_severe_pct,busca_suporte_mental_pct,intencao_troca_emprego_pct,usa_terapia_pct,uso_diario_ia_pct
+work_mode,Hybrid,39856,7.0156,5.4325,4.8399,5.7981,5.795,47.1188,6.0992,28.9793,48.2286,49.5158,33.5784,14.9413,72.91
+work_mode,On-site,25208,6.974,5.2462,4.8245,5.3945,5.8205,47.126,6.1096,26.321,45.6918,48.4965,33.2593,15.4356,73.1593
+work_mode,Remote,34936,7.1595,5.4787,4.8364,5.0145,5.8051,47.0714,6.1008,29.743,49.2272,51.0333,29.2964,15.2822,73.0049

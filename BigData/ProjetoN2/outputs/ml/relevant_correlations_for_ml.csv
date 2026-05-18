@@ -1,0 +1,16 @@
+variavel_1,variavel_2,correlacao,abs_correlacao,par
+stress_score,burnout_score,0.853803,0.853803,burnout_score | stress_score
+gad7_score,burnout_score,0.716728,0.716728,burnout_score | gad7_score
+phq9_score,burnout_score,0.716383,0.716383,burnout_score | phq9_score
+gad7_score,stress_score,0.634379,0.634379,gad7_score | stress_score
+stress_score,meetings_per_day,0.610844,0.610844,meetings_per_day | stress_score
+phq9_score,stress_score,0.600232,0.600232,phq9_score | stress_score
+burnout_score,work_hours_per_week,0.47405,0.47405,burnout_score | work_hours_per_week
+meetings_per_day,burnout_score,0.455603,0.455603,burnout_score | meetings_per_day
+stress_score,work_hours_per_week,0.374966,0.374966,stress_score | work_hours_per_week
+burnout_score,sleep_hours_per_night,-0.338268,0.338268,burnout_score | sleep_hours_per_night
+deadline_pressure_score,stress_score,0.316349,0.316349,deadline_pressure_score | stress_score
+vacation_days_taken,burnout_score,-0.279164,0.279164,burnout_score | vacation_days_taken
+job_change_intention,burnout_score,0.252827,0.252827,burnout_score | job_change_intention
+sleep_hours_per_night,stress_score,-0.231635,0.231635,sleep_hours_per_night | stress_score
+burnout_score,seeks_mental_health_support,0.220514,0.220514,burnout_score | seeks_mental_health_support

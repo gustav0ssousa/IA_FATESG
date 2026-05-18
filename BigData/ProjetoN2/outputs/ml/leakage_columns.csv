@@ -1,0 +1,10 @@
+coluna,motivo
+employee_id,"Identificador unico, sem valor preditivo generalizavel."
+burnout_score,Deriva diretamente o nivel de burnout e causaria vazamento.
+stress_score,Resultado psicologico muito proximo do alvo; usar apenas em cenario alternativo.
+phq9_score,Instrumento clinico correlato; pode representar vazamento conceitual.
+phq9_category,Categoria derivada de phq9_score.
+gad7_score,Instrumento clinico correlato; pode representar vazamento conceitual.
+gad7_category,Categoria derivada de gad7_score.
+seeks_mental_health_support,Pode ser consequencia do estado de saude mental.
+job_change_intention,Pode ser consequencia de burnout e insatisfacao.

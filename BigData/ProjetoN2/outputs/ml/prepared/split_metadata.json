@@ -1,0 +1,62 @@
+{
+  "target_column": "burnout_level",
+  "problem_type": "classification_multiclass",
+  "random_state": 42,
+  "test_size": 0.2,
+  "train_rows": 80000,
+  "test_rows": 20000,
+  "raw_predictor_count": 23,
+  "prepared_feature_count": 54,
+  "numeric_columns": [
+    "years_experience",
+    "years_at_company",
+    "salary_usd",
+    "work_hours_per_week",
+    "meetings_per_day",
+    "team_size",
+    "sleep_hours_per_night",
+    "exercise_days_per_week",
+    "vacation_days_taken",
+    "manager_support_score",
+    "work_life_balance_score",
+    "job_satisfaction_score",
+    "social_support_score",
+    "deadline_pressure_score",
+    "autonomy_score"
+  ],
+  "binary_columns": [
+    "therapy_access",
+    "uses_therapy",
+    "ai_tools_daily"
+  ],
+  "categorical_columns": [
+    "job_role",
+    "seniority_level",
+    "company_size",
+    "industry",
+    "work_mode"
+  ],
+  "fairness_audit_columns": [
+    "age",
+    "gender",
+    "country"
+  ],
+  "leakage_columns_removed": [
+    "employee_id",
+    "burnout_score",
+    "stress_score",
+    "phq9_score",
+    "phq9_category",
+    "gad7_score",
+    "gad7_category",
+    "seeks_mental_health_support",
+    "job_change_intention"
+  ],
+  "prepared_files": {
+    "X_train_prepared": "outputs/ml/prepared/X_train_prepared.npz",
+    "X_test_prepared": "outputs/ml/prepared/X_test_prepared.npz",
+    "preprocessor": "outputs/ml/prepared/preprocessor.joblib",
+    "y_train": "outputs/ml/prepared/y_train.csv",
+    "y_test": "outputs/ml/prepared/y_test.csv"
+  }
+}

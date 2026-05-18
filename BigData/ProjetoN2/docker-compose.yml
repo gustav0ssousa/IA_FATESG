@@ -1,0 +1,165 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    container_name: projeto_n2_postgres
+    env_file:
+      - .env
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./data:/data:ro
+      - ./sql:/sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U mental_health_user -d mental_health_tech"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  import-data:
+    build: .
+    env_file:
+      - .env
+    environment:
+      POSTGRES_HOST: postgres
+      CSV_PATH: /app/${CSV_PATH}
+    command: ["python", "scripts/import_data.py"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./data:/app/data:ro
+      - ./sql:/app/sql:ro
+    restart: "no"
+
+  clean-data:
+    build: .
+    env_file:
+      - .env
+    environment:
+      POSTGRES_HOST: postgres
+    command: ["python", "scripts/clean_data.py"]
+    depends_on:
+      import-data:
+        condition: service_completed_successfully
+    volumes:
+      - ./sql:/app/sql:ro
+    restart: "no"
+
+  statistical-analysis:
+    build: .
+    env_file:
+      - .env
+    environment:
+      POSTGRES_HOST: postgres
+    command: ["python", "scripts/statistical_analysis.py"]
+    depends_on:
+      clean-data:
+        condition: service_completed_successfully
+    volumes:
+      - ./outputs:/app/outputs
+    restart: "no"
+
+  dashboard-export:
+    build: .
+    env_file:
+      - .env
+    environment:
+      POSTGRES_HOST: postgres
+    command: ["python", "scripts/dashboard_visual.py"]
+    depends_on:
+      statistical-analysis:
+        condition: service_completed_successfully
+    volumes:
+      - ./outputs:/app/outputs
+    restart: "no"
+
+  ml-problem-definition:
+    build: .
+    env_file:
+      - .env
+    command: ["python", "scripts/define_ml_problem.py"]
+    depends_on:
+      statistical-analysis:
+        condition: service_completed_successfully
+    volumes:
+      - ./outputs:/app/outputs
+    restart: "no"
+
+  ml-data-preparation:
+    build: .
+    env_file:
+      - .env
+    environment:
+      POSTGRES_HOST: postgres
+    command: ["python", "scripts/prepare_ml_data.py"]
+    depends_on:
+      ml-problem-definition:
+        condition: service_completed_successfully
+    volumes:
+      - ./outputs:/app/outputs
+    restart: "no"
+
+  train-first-model:
+    build: .
+    command: ["python", "scripts/train_first_model.py"]
+    depends_on:
+      ml-data-preparation:
+        condition: service_completed_successfully
+    volumes:
+      - ./outputs:/app/outputs
+    restart: "no"
+
+  train-second-model:
+    build: .
+    command: ["python", "scripts/train_second_model.py"]
+    depends_on:
+      ml-data-preparation:
+        condition: service_completed_successfully
+    volumes:
+      - ./outputs:/app/outputs
+    restart: "no"
+
+  compare-models:
+    build: .
+    command: ["python", "scripts/compare_models.py"]
+    depends_on:
+      train-first-model:
+        condition: service_completed_successfully
+      train-second-model:
+        condition: service_completed_successfully
+    volumes:
+      - ./outputs:/app/outputs
+    restart: "no"
+
+  streamlit:
+    build: .
+    env_file:
+      - .env
+    environment:
+      POSTGRES_HOST: postgres
+    command:
+      [
+        "streamlit",
+        "run",
+        "app/streamlit_app.py",
+        "--server.address=0.0.0.0",
+        "--server.port=8501"
+      ]
+    ports:
+      - "${STREAMLIT_SERVER_PORT:-8501}:8501"
+    depends_on:
+      statistical-analysis:
+        condition: service_completed_successfully
+    volumes:
+      - ./data:/app/data:ro
+      - ./sql:/app/sql:ro
+      - ./outputs:/app/outputs
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
