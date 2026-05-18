@@ -127,24 +127,6 @@ python scripts/compare_models.py
 streamlit run app/streamlit_app.py
 ```
 
----
-
-## Etapas do projeto
-
-| Passo | Descricao | Documentacao |
-|:---:|---|---|
-| 1 | Compreensao do dataset | [`docs/01_compreensao_dataset.md`](docs/01_compreensao_dataset.md) |
-| 2 | ETL: extracao, transformacao e carga | [`docs/02_etl.md`](docs/02_etl.md) |
-| 3 | Analise estatistica descritiva | [`docs/03_analise_estatistica.md`](docs/03_analise_estatistica.md) |
-| 4 | Dashboard visual (Plotly + Streamlit) | [`docs/04_dashboard_visual.md`](docs/04_dashboard_visual.md) |
-| 5 | Definicao do problema de ML | [`docs/05_definicao_ml.md`](docs/05_definicao_ml.md) |
-| 6 | Preparacao dos dados para ML | [`docs/06_preparacao_ml.md`](docs/06_preparacao_ml.md) |
-| 7 | Primeiro algoritmo — Regressao Logistica | [`docs/07_primeiro_algoritmo.md`](docs/07_primeiro_algoritmo.md) |
-| 8 | Segundo algoritmo — Random Forest | [`docs/08_segundo_algoritmo.md`](docs/08_segundo_algoritmo.md) |
-| 9 | Comparacao dos algoritmos | [`docs/09_comparacao_algoritmos.md`](docs/09_comparacao_algoritmos.md) |
-| 10 | Conclusao final | [`docs/10_conclusao_final.md`](docs/10_conclusao_final.md) |
-
----
 
 ## Principais descobertas
 
