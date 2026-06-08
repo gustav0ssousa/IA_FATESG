@@ -19,8 +19,8 @@ from pathlib import Path
 
 # Raiz do projeto (pai de src/)
 PROJECT_ROOT  = Path(__file__).resolve().parent.parent
-PASTA_DADOS   = PROJECT_ROOT / "data"
-PASTA_LIMPOS  = PASTA_DADOS / "clean"
+PASTA_DADOS   = Path("data/raw")
+PASTA_LIMPOS  = Path("data/clean")
 BATCH_WRITE   = 10_000       # linhas acumuladas antes de flush em disco
 LOG_INTERVAL  = 500_000      # progresso a cada N linhas lidas
 
@@ -87,7 +87,7 @@ def limpar_pessoa() -> set:
       - Remove registros com id_pessoa nulo
     Retorna: set dos id_pessoa válidos (para checagem referencial)
     """
-    arquivo_in  = PASTA_DADOS / "pessoa.jsonl"
+    arquivo_in  = PASTA_DADOS / "raw_pessoa.jsonl"
     arquivo_out = PASTA_LIMPOS / "pessoa_clean.jsonl"
     stats = Stats("pessoa.jsonl")
     ids_vistos = set()
@@ -155,7 +155,7 @@ def limpar_producao() -> set:
       - Remove registros com id_producao nulo
     Retorna: set dos id_producao válidos
     """
-    arquivo_in  = PASTA_DADOS / "producao.jsonl"
+    arquivo_in  = PASTA_DADOS / "raw_producao.jsonl"
     arquivo_out = PASTA_LIMPOS / "producao_clean.jsonl"
     stats = Stats("producao.jsonl")
     ids_vistos = set()
@@ -252,7 +252,7 @@ def limpar_equipe(ids_pessoa: set, ids_producao: set):
       - Remove registros com id_producao ou id_pessoa nulos
       - Trata papel=null (mantém registro, remove campo)
     """
-    arquivo_in  = PASTA_DADOS / "equipe.jsonl"
+    arquivo_in  = PASTA_DADOS / "raw_equipe.jsonl"
     arquivo_out = PASTA_LIMPOS / "equipe_clean.jsonl"
     stats = Stats("equipe.jsonl")
     vistos = set()
