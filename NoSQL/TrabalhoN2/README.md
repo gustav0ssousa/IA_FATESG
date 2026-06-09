@@ -57,9 +57,8 @@ Usuario/Dashboard
               +--> resposta com fontes
 ```
 
-RabbitMQ sera introduzido quando a ingestao assíncrona fizer sentido para o
-volume ou para evitar bloqueio das requisicoes HTTP. No MVP inicial, a ingestao
-pode ser sincrona para reduzir complexidade.
+RabbitMQ e Celery executam a indexacao vetorial fora da requisicao HTTP. O
+endpoint sincrono permanece disponivel para diagnostico e operacao local.
 
 LangChain podera ser usado para integrar loaders, splitters, retrievers, prompts
 e chamadas de modelos. Regras de negocio, contratos da API e persistencia nao
@@ -146,7 +145,7 @@ cd NoSQL/TrabalhoN2
 python3 -m venv .venv
 .venv/bin/pip install -r requirements.txt
 cp .env.example .env
-docker compose up -d postgres
+docker compose up -d
 ```
 
 Execucao:
@@ -157,6 +156,16 @@ Execucao:
 ```
 
 A API estara disponivel em `http://127.0.0.1:8000`.
+
+Em outro terminal, inicie o worker:
+
+```bash
+cd backend
+../.venv/bin/celery -A config worker --loglevel=INFO --concurrency=1
+```
+
+O painel local do RabbitMQ fica em `http://127.0.0.1:15672`, usando as
+credenciais locais configuradas no Compose.
 
 ## API atual
 
@@ -208,6 +217,8 @@ Resposta esperada:
 | `MARITACA_MAX_OUTPUT_TOKENS` | Limite de tokens da resposta |
 | `MARITACA_TIMEOUT_SECONDS` | Timeout da chamada à LLM |
 | `MARITACA_MAX_RETRIES` | Retentativas automaticas da chamada |
+| `CELERY_BROKER_URL` | Conexao AMQP usada pelo Celery |
+| `CELERY_INDEXING_MAX_RETRIES` | Retentativas de um job de indexacao |
 
 ## Persistencia estruturada
 
@@ -215,6 +226,7 @@ O PostgreSQL armazena:
 
 - `Document`: origem, hash unico, status, metadados e auditoria.
 - `DocumentChunk`: conteudo dos chunks, ordem, hash, pagina e metadados.
+- `IndexingJob`: estado, tentativas, erros e tempos da indexacao assíncrona.
 
 O hash unico de documento evita ingestao duplicada. Ao reprocessar um documento,
 o repositorio substitui seus chunks dentro de uma transacao.
@@ -253,12 +265,22 @@ PDFs baseados apenas em imagem ainda exigem OCR e retornam erro controlado.
 ## Como indexar no Qdrant
 
 Depois da ingestao, o documento possui status `chunked`. Para gerar embeddings e
-persistir os vetores:
+persistir os vetores sem bloquear a requisicao:
 
 ```bash
-docker compose up -d qdrant
-curl -X POST http://127.0.0.1:8000/api/rag/documents/UUID_DO_DOCUMENTO/index
+docker compose up -d qdrant rabbitmq
+curl -X POST http://127.0.0.1:8000/api/rag/documents/UUID_DO_DOCUMENTO/index-async
 ```
+
+O endpoint retorna `202 Accepted` e um `id` de job. Consulte seu estado:
+
+```bash
+curl http://127.0.0.1:8000/api/rag/jobs/UUID_DO_JOB
+```
+
+Estados possiveis: `queued`, `processing`, `retrying`, `completed` e `failed`.
+Falhas temporarias sao retentadas com backoff exponencial. O endpoint sincrono
+`POST /api/rag/documents/UUID_DO_DOCUMENTO/index` permanece disponivel.
 
 O modelo padrao e
 `sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2`, executado
@@ -344,10 +366,12 @@ Baseline inicial:
 - [Sprint 4 - Embeddings e Qdrant](docs/SPRINT_4.md)
 - [Sprint 5 - Consulta RAG e Maritaca](docs/SPRINT_5.md)
 - [Sprint 6 - Avaliacao minima](docs/SPRINT_6.md)
+- [Sprint 7 - Indexacao assíncrona](docs/SPRINT_7.md)
 - [Plano de sprints](docs/SPRINT_PLAN.md)
 - [Decisoes arquiteturais](docs/ADR.md)
 
 ## Status
 
-Sprint 6 concluida com dataset versionado, metricas, quality gate e relatorios de
-avaliacao. A proxima etapa prevista e ingestao assíncrona com RabbitMQ.
+Sprint 7 concluida com RabbitMQ, Celery, jobs persistidos, retentativas e
+indexacao vetorial assíncrona validada de ponta a ponta. A proxima etapa prevista
+e o dashboard inicial.

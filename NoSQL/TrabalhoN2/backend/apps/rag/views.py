@@ -8,7 +8,13 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.documents.models import Document
-from apps.rag.serializers import RAGQuerySerializer, SemanticSearchSerializer
+from apps.rag.async_indexing import AsyncIndexingError, AsyncIndexingService
+from apps.rag.models import IndexingJob
+from apps.rag.serializers import (
+    IndexingJobSerializer,
+    RAGQuerySerializer,
+    SemanticSearchSerializer,
+)
 from apps.rag.services import (
     DocumentIndexingError,
     RAGQueryError,
@@ -38,6 +44,34 @@ class DocumentIndexView(APIView):
                 "indexed_chunks": chunk_count,
             }
         )
+
+
+class AsyncDocumentIndexView(APIView):
+    authentication_classes = []
+    permission_classes = []
+
+    def post(self, request: Request, document_id: str) -> Response:
+        document = get_object_or_404(Document, id=document_id)
+        try:
+            job = AsyncIndexingService().enqueue(document)
+        except AsyncIndexingError as error:
+            return Response(
+                {"detail": str(error)},
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
+        return Response(
+            IndexingJobSerializer(job).data,
+            status=status.HTTP_202_ACCEPTED,
+        )
+
+
+class IndexingJobDetailView(APIView):
+    authentication_classes = []
+    permission_classes = []
+
+    def get(self, request: Request, job_id: str) -> Response:
+        job = get_object_or_404(IndexingJob, id=job_id)
+        return Response(IndexingJobSerializer(job).data)
 
 
 class SemanticSearchView(APIView):

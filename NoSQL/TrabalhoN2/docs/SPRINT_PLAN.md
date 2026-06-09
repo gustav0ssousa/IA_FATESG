@@ -121,6 +121,9 @@ Escopo previsto:
 Objetivo: mover indexacao para worker assíncrono quando a base RAG estiver
 funcional.
 
+Status: concluida com RabbitMQ, Celery, jobs persistidos no PostgreSQL,
+retentativas com backoff e validacao real de indexacao.
+
 Escopo previsto:
 
 - Docker Compose com RabbitMQ.

@@ -274,3 +274,39 @@ quality gate inicial.
 A avaliacao pode rodar localmente e detectar regressao cedo. As metricas de
 termos e citacoes sao aproximacoes e nao provam fidelidade semantica completa.
 O dataset precisa crescer junto com os documentos reais.
+
+## ADR: Celery com RabbitMQ e estado de jobs no PostgreSQL
+
+### Status
+
+Aceito e implementado na Sprint 7.
+
+### Contexto
+
+A geracao de embeddings e a indexacao no Qdrant podem demorar, falhar
+temporariamente ou bloquear requisicoes HTTP. Tambem e necessario consultar o
+estado da operacao sem depender da disponibilidade do broker.
+
+### Decisao
+
+Usar Celery 5.6 com RabbitMQ como broker para executar a indexacao vetorial.
+Persistir o ciclo de vida de cada `IndexingJob` no PostgreSQL e aplicar ate tres
+retentativas com backoff exponencial. Manter a indexacao sincrona como endpoint
+de diagnostico.
+
+### Alternativas consideradas
+
+- Django-Q ou Huey: integracao simples, mas menor aderencia a stack RabbitMQ
+  inicialmente planejada.
+- RabbitMQ consumido diretamente: maior controle, mas exige implementar
+  protocolo de tarefas, retentativas e ciclo do worker.
+- Resultado apenas no backend do Celery: reduz modelagem, mas acopla a API a
+  detalhes operacionais e oferece historico de negocio mais fraco.
+
+### Consequencias
+
+Requisicoes de indexacao retornam rapidamente e falhas temporarias podem ser
+recuperadas. O PostgreSQL fornece historico consultavel mesmo sem backend de
+resultados Celery. Em contrapartida, o ambiente passa a exigir RabbitMQ e ao
+menos um worker ativo. Jobs interrompidos durante `processing` ainda exigirao
+uma politica futura de deteccao e reenvio.
