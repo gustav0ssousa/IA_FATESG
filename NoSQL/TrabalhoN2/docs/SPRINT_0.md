@@ -8,8 +8,8 @@ criterios de aceite do MVP e suposicoes iniciais.
 
 ## Escopo
 
-- Diagnostico da stack proposta: Qdrant, PostgreSQL, FastAPI, RabbitMQ,
-  Maritaca e dashboard com Next.js/Tailwind.
+- Diagnostico da stack proposta: Qdrant, PostgreSQL, FastAPI/Django, RabbitMQ,
+  Maritaca, LangChain e dashboard com Next.js/Tailwind.
 - Identificacao de pontos fortes, lacunas, ambiguidades e riscos.
 - Recomendacoes separadas em essenciais, recomendadas e opcionais.
 - Proposta de arquitetura inicial.
@@ -32,8 +32,12 @@ criterios de aceite do MVP e suposicoes iniciais.
 
 ### Pontos fortes
 
-- **FastAPI**: boa escolha para APIs RAG por ser simples, performatica,
-  compativel com tipagem Python, Pydantic e documentacao OpenAPI.
+- **Django + Django REST Framework**: opcao recomendada em avaliacao por integrar
+  ORM, migrations, autenticacao, painel administrativo e APIs estruturadas.
+- **FastAPI**: permanece uma boa alternativa se o sistema for reduzido a uma API
+  RAG enxuta, com prioridade para simplicidade e operacoes assíncronas.
+- **LangChain**: oferece integracoes para loaders, splitters, embeddings,
+  retrievers, Qdrant e modelos, acelerando experimentos RAG.
 - **Qdrant**: apropriado para busca vetorial, filtros por metadados e evolucao
   para colecoes com payloads mais ricos.
 - **PostgreSQL**: forte para dados estruturados, auditoria, usuarios, historico
@@ -57,6 +61,8 @@ criterios de aceite do MVP e suposicoes iniciais.
   expor dados sensiveis.
 - Se Maritaca nao oferecer embedding adequado ao caso, sera necessario usar um
   provedor/modelo separado para embeddings.
+- Django adiciona mais estrutura e configuracao inicial que FastAPI.
+- LangChain pode introduzir acoplamento, dependencias extras e mudancas de API.
 
 ## Recomendacoes de melhoria
 
@@ -70,6 +76,7 @@ criterios de aceite do MVP e suposicoes iniciais.
 - Retornar fontes e trechos recuperados em toda resposta RAG.
 - Implementar testes minimos para chunking, configuracao e fluxo de consulta.
 - Comecar com MVP sincrono e simples antes de ativar workers com RabbitMQ.
+- Encapsular LangChain em adaptadores e servicos proprios.
 
 ### Recomendadas
 
@@ -81,6 +88,7 @@ criterios de aceite do MVP e suposicoes iniciais.
 - Preparar metadados para filtros futuros, como fonte, tipo de arquivo, data e
   categoria.
 - Documentar cada decisao arquitetural importante em ADR simplificado.
+- Confirmar Django/DRF ou FastAPI antes de criar o scaffold da Sprint 1.
 
 ### Opcionais
 
@@ -99,9 +107,9 @@ criterios de aceite do MVP e suposicoes iniciais.
 Dashboard Next.js ou cliente HTTP
         |
         v
-     FastAPI
+ Django + Django REST Framework
         |
-        +--> API de documentos
+        +--> App documents / API de documentos
         |       +--> IngestionService
         |       +--> TextExtractor
         |       +--> TextNormalizer
@@ -110,17 +118,21 @@ Dashboard Next.js ou cliente HTTP
         |       +--> QdrantVectorStore
         |       +--> DocumentRepository/PostgreSQL
         |
-        +--> API de chat/consulta
+        +--> App rag + app chat / API de consulta
         |       +--> QueryEmbedding
         |       +--> Retriever
         |       +--> PromptBuilder
         |       +--> LLMProvider/Maritaca
         |       +--> QueryRepository/PostgreSQL
         |
-        +--> API de health/config
+        +--> App common / API de health
+        +--> Django ORM/Admin/Auth
 
 Opcional futuro:
-FastAPI --> RabbitMQ --> Worker de indexacao --> Qdrant/PostgreSQL
+Django --> RabbitMQ --> Worker de indexacao --> Qdrant/PostgreSQL
+
+LangChain, encapsulado em servicos:
+loaders/splitters --> embeddings --> Qdrant retriever --> prompt --> Maritaca
 ```
 
 ## Fluxo RAG proposto
@@ -214,7 +226,8 @@ FastAPI --> RabbitMQ --> Worker de indexacao --> Qdrant/PostgreSQL
 - PostgreSQL sera usado para metadados, auditoria e historico; Qdrant para
   vetores.
 - LLM e embeddings terao interfaces separadas para facilitar troca de provider.
-- Orquestracao RAG sera propria no MVP para evitar overengineering.
+- Django + DRF e a opcao recomendada em avaliacao para o backend.
+- LangChain sera considerado para orquestracao, encapsulado por servicos proprios.
 
 ## Arquivos criados ou alterados
 
@@ -254,14 +267,13 @@ NoSQL/TrabalhoN2/
     SPRINT_0.md
     SPRINT_PLAN.md
   backend/
-    app/
-      api/
-      core/
-      models/
-      schemas/
-      services/
-      repositories/
+    manage.py
+    config/
+    apps/
+      documents/
       rag/
+      chat/
+      common/
     tests/
   data/
     samples/
@@ -274,7 +286,8 @@ As pastas de implementacao serao criadas nas sprints correspondentes.
 
 Resumo:
 
-1. Sprint 1: scaffold FastAPI, configuracao e health check.
+1. Sprint 1: decisao final de framework, scaffold Django/DRF recomendado,
+   configuracao e health check.
 2. Sprint 2: modelos, PostgreSQL e persistencia de documentos.
 3. Sprint 3: ingestao, extracao simples e chunking.
 4. Sprint 4: embeddings e Qdrant.
@@ -303,7 +316,10 @@ Detalhes em `docs/SPRINT_PLAN.md`.
 ## Suposicoes assumidas
 
 - O projeto sera desenvolvido dentro de `NoSQL/TrabalhoN2`.
-- O backend sera Python com FastAPI.
+- O backend sera Python; Django + DRF e a opcao recomendada em avaliacao.
+- LangChain podera ser usado somente atras de interfaces proprias.
+- Se nao houver decisao contraria antes da Sprint 1, Django + DRF sera adotado e
+  LangChain sera integrado de forma encapsulada nas sprints de RAG.
 - O idioma principal dos documentos e perguntas sera portugues.
 - O MVP pode iniciar sem autenticacao.
 - O MVP pode iniciar com ingestao sincrona.
@@ -315,14 +331,17 @@ Detalhes em `docs/SPRINT_PLAN.md`.
 
 ## Perguntas bloqueantes
 
-Nao ha perguntas bloqueantes para iniciar a Sprint 1. As duvidas abaixo podem ser
-respondidas ao longo do desenvolvimento:
+Nao ha perguntas bloqueantes para iniciar a Sprint 1, pois existe uma suposicao
+padrao documentada. As duvidas abaixo podem ser respondidas ao longo do
+desenvolvimento:
 
 - Quais documentos reais serao usados na demonstracao?
 - O provider de embeddings devera ser Maritaca ou outro modelo multilíngue?
 - Havera necessidade de autenticar usuarios no MVP academico?
 - O dashboard sera obrigatorio para a entrega ou apenas diferencial?
 - Existe limite de custo mensal para chamadas de LLM?
+- Django + DRF deve ser confirmado como framework final antes da Sprint 1?
+- LangChain sera aceito como dependencia de orquestracao no projeto academico?
 
 ## Checklist de conclusao
 
@@ -338,6 +357,7 @@ respondidas ao longo do desenvolvimento:
 - [x] Suposicoes documentadas.
 - [x] Perguntas bloqueantes avaliadas.
 - [x] ADRs iniciais registrados.
+- [x] Possivel troca para Django e LangChain analisada e documentada.
 
 ## Riscos e pendencias
 
@@ -348,10 +368,14 @@ respondidas ao longo do desenvolvimento:
 - Autenticacao e autorizacao devem ser revisitadas antes de qualquer uso com
   dados sensiveis.
 - RabbitMQ deve entrar apenas quando houver ganho claro de robustez operacional.
+- A decisao Django/DRF versus FastAPI deve ser fechada antes do scaffold.
+- LangChain deve ser validado por ganho real, cobertura de testes e facilidade de
+  substituicao.
 
 ## Proxima sprint prevista
 
-Sprint 1 - Fundacao Backend: criar scaffold FastAPI, configuracao por ambiente,
-health check, estrutura modular, README de setup local e primeiros testes.
+Sprint 1 - Fundacao Backend: confirmar Django/DRF ou FastAPI e criar o scaffold
+escolhido, configuracao por ambiente, health check, estrutura modular, README de
+setup local e primeiros testes.
 
 Sprint finalizada. Aguardando o comando `continuar` para iniciar a proxima sprint.

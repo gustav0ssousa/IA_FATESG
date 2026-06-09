@@ -9,14 +9,18 @@ Status: concluida.
 
 ## Sprint 1 - Fundacao Backend
 
-Objetivo: criar a base do backend FastAPI com estrutura modular, configuracao por
-ambiente, health check, testes iniciais e documentacao de setup local.
+Objetivo: confirmar a decisao de framework e criar a base do backend. A opcao
+recomendada em avaliacao e Django com Django REST Framework, mantendo FastAPI
+como alternativa caso o escopo seja reduzido a uma API RAG enxuta.
+
+Status: concluida com Django 5.2 LTS e Django REST Framework.
 
 Escopo previsto:
 
-- Estrutura `backend/app`.
-- FastAPI com `GET /health`.
-- Configuracao com Pydantic Settings.
+- Registrar decisao final entre Django/DRF e FastAPI.
+- Projeto Django e apps iniciais, caso Django seja confirmado.
+- Django REST Framework com `GET /api/health`.
+- Configuracao por variaveis de ambiente.
 - `.env.example`.
 - Testes com Pytest.
 - README com como executar e testar.
@@ -26,6 +30,7 @@ Fora do escopo:
 - Banco de dados.
 - Qdrant.
 - LLM.
+- Integracao LangChain.
 - Ingestao real de documentos.
 
 ## Sprint 2 - Persistencia Estruturada com PostgreSQL
@@ -33,13 +38,16 @@ Fora do escopo:
 Objetivo: adicionar PostgreSQL para registrar documentos, chunks, status de
 indexacao e historico basico.
 
+Status: concluida. A validacao real do container PostgreSQL ficou pendente porque
+o daemon Docker nao estava acessivel no ambiente de execucao.
+
 Escopo previsto:
 
 - Docker Compose com PostgreSQL.
-- SQLAlchemy ou SQLModel.
-- Modelos/tabelas iniciais.
-- Repositorios.
-- Migrations, se viavel.
+- Django ORM.
+- Models e migrations.
+- Camada de servicos e acesso a dados.
+- Django Admin basico para inspecao dos documentos.
 - Testes de persistencia.
 
 ## Sprint 3 - Ingestao, Extracao e Chunking
@@ -47,17 +55,24 @@ Escopo previsto:
 Objetivo: implementar entrada de documentos e transformacao em chunks com
 metadados.
 
+Status: concluida com endpoint de upload, extratores proprios e
+`langchain-text-splitters` encapsulado.
+
 Escopo previsto:
 
 - Upload ou leitura de arquivos.
 - Suporte inicial a `.txt`, `.md` e `.pdf`.
 - Normalizacao de texto.
-- Chunking configuravel.
+- Loaders e text splitters do LangChain avaliados atras de adaptadores proprios.
+- Chunking configuravel e independente do framework de orquestracao.
 - Testes unitarios de chunking.
 
 ## Sprint 4 - Embeddings e Qdrant
 
 Objetivo: gerar embeddings e persistir chunks vetorizados no Qdrant.
+
+Status: concluida com FastEmbed, Qdrant, indexacao por documento e busca
+semantica inicial.
 
 Escopo previsto:
 
@@ -65,6 +80,7 @@ Escopo previsto:
 - Interface `EmbeddingProvider`.
 - Implementacao configuravel de embeddings.
 - Interface `VectorStore`.
+- Adaptador LangChain para Qdrant, se aprovado pelos testes.
 - Insercao e busca vetorial inicial.
 - Testes com mocks e/ou ambiente local.
 
@@ -73,11 +89,15 @@ Escopo previsto:
 Objetivo: implementar endpoint de pergunta e resposta com retrieval, prompt e
 LLM.
 
+Status: concluida com Responses API da Maritaca, prompt fundamentado e retorno
+de fontes.
+
 Escopo previsto:
 
 - `POST /chat/query`.
 - Retriever semantico `top_k`.
-- Prompt builder com contexto e instrucao anti-alucinacao.
+- Chain LangChain para retrieval e prompt, encapsulada em servico proprio.
+- Prompt com contexto e instrucao anti-alucinacao.
 - Interface `LLMProvider`.
 - Integracao com Maritaca.
 - Resposta com fontes.
@@ -85,6 +105,9 @@ Escopo previsto:
 ## Sprint 6 - Avaliacao Minima e Testes de Fluxo
 
 Objetivo: criar validacoes de qualidade para recuperacao e geracao.
+
+Status: concluida com dataset versionado, metricas deterministicas, quality gate
+e comando de avaliacao.
 
 Escopo previsto:
 

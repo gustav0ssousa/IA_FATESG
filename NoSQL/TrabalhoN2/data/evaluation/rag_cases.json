@@ -1,0 +1,26 @@
+{
+  "version": 1,
+  "cases": [
+    {
+      "id": "retrieval-purpose",
+      "question": "O que o sistema faz antes de responder uma pergunta?",
+      "expected_sources": ["rag_overview.md"],
+      "expected_answer_terms": ["trechos relevantes", "documentos indexados"],
+      "answerable": true
+    },
+    {
+      "id": "ingestion-metadata",
+      "question": "Quais informacoes sao associadas ao documento durante a ingestao?",
+      "expected_sources": ["rag_overview.md"],
+      "expected_answer_terms": ["identificador", "hash", "metadados"],
+      "answerable": true
+    },
+    {
+      "id": "generation-sources",
+      "question": "Como a resposta gerada deve tratar as fontes?",
+      "expected_sources": ["rag_overview.md"],
+      "expected_answer_terms": ["citar", "fontes"],
+      "answerable": true
+    }
+  ]
+}
