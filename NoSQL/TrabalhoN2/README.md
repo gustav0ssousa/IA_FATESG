@@ -9,7 +9,7 @@ Este projeto sera desenvolvido em sprints para criar um sistema RAG
 | --- | --- |
 | Linguagem | Python no backend; TypeScript se houver frontend |
 | Framework backend | Django 5.2 LTS + Django REST Framework |
-| Framework frontend | Next.js + Tailwind CSS, previsto para fase posterior |
+| Framework frontend | Next.js 16 + React 19 + Tailwind CSS 4 |
 | LLM provider | Maritaca, com interface desacoplada para troca futura |
 | Modelo de embedding | A definir na implementacao; preferencia por modelo multilíngue adequado a portugues |
 | Banco vetorial | Qdrant |
@@ -18,7 +18,7 @@ Este projeto sera desenvolvido em sprints para criar um sistema RAG
 | Sistema de autenticacao | Django Auth; JWT/API key previsto para a API |
 | Infra/deploy | Docker Compose local; producao a definir |
 | Observabilidade/logs | Logs estruturados no backend; metricas basicas em fase posterior |
-| Ambiente local | Docker Compose + Python virtualenv |
+| Ambiente local | Pilha completa em Docker Compose; virtualenv opcional para desenvolvimento |
 | Ambiente producao | A definir; recomendacao futura: VPS/cloud com containers |
 | Tipo de dados indexados | Documentos textuais e arquivos academicos/administrativos |
 | Formatos de arquivos | MVP: `.txt`, `.md` e `.pdf`; futuro: `.docx`, `.csv`, paginas web |
@@ -59,6 +59,8 @@ Usuario/Dashboard
 
 RabbitMQ e Celery executam a indexacao vetorial fora da requisicao HTTP. O
 endpoint sincrono permanece disponivel para diagnostico e operacao local.
+No Compose, API e worker usam um servico interno de embeddings para compartilhar
+uma unica instancia do modelo ONNX.
 
 LangChain podera ser usado para integrar loaders, splitters, retrievers, prompts
 e chamadas de modelos. Regras de negocio, contratos da API e persistencia nao
@@ -131,41 +133,36 @@ NoSQL/TrabalhoN2/
   docker/
 ```
 
-## Setup local
+## Setup local com containers
 
 Requisitos:
 
-- Python 3.12 ou superior compativel com Django 5.2.
-- `venv` e `pip`.
+- Docker com Docker Compose.
 
 Configuracao:
 
 ```bash
 cd NoSQL/TrabalhoN2
-python3 -m venv .venv
-.venv/bin/pip install -r requirements.txt
 cp .env.example .env
-docker compose up -d
+docker compose up -d --build
+docker compose ps
 ```
 
-Execucao:
+O dashboard fica em `http://127.0.0.1:3000` e a API em
+`http://127.0.0.1:8000`. As migrations sao aplicadas automaticamente antes do
+Gunicorn iniciar. PostgreSQL, Qdrant e RabbitMQ ficam isolados na rede interna.
+
+Comandos operacionais:
 
 ```bash
-.venv/bin/python backend/manage.py migrate
-.venv/bin/python backend/manage.py runserver
+docker compose logs -f api worker frontend
+docker compose exec api python manage.py createsuperuser
+docker compose exec api python manage.py check
+docker compose down
 ```
 
-A API estara disponivel em `http://127.0.0.1:8000`.
-
-Em outro terminal, inicie o worker:
-
-```bash
-cd backend
-../.venv/bin/celery -A config worker --loglevel=INFO --concurrency=1
-```
-
-O painel local do RabbitMQ fica em `http://127.0.0.1:15672`, usando as
-credenciais locais configuradas no Compose.
+Detalhes de imagens, redes, volumes e desenvolvimento hibrido estao em
+[Containers e operacao local](docs/CONTAINERS.md).
 
 ## API atual
 
@@ -190,6 +187,16 @@ Resposta esperada:
 ```bash
 .venv/bin/pytest
 .venv/bin/python backend/manage.py check
+cd frontend
+npm run lint
+npm run test:e2e
+npm run build
+```
+
+Os mesmos checks Django podem ser executados na pilha containerizada:
+
+```bash
+docker compose exec api python manage.py check
 ```
 
 ## Variaveis de ambiente
@@ -206,6 +213,12 @@ Resposta esperada:
 | `RAG_CHUNK_OVERLAP` | Sobreposicao entre chunks em caracteres |
 | `EMBEDDING_MODEL` | Modelo local usado pelo FastEmbed |
 | `EMBEDDING_DIMENSION` | Dimensao vetorial esperada pelo Qdrant |
+| `EMBEDDING_CACHE_DIR` | Diretorio persistente do modelo de embedding |
+| `EMBEDDING_THREADS` | Threads usadas pelo runtime ONNX |
+| `EMBEDDING_ENABLE_CPU_MEM_ARENA` | Arena de memoria ONNX; desativada no perfil local |
+| `EMBEDDING_SERVICE_URL` | Endpoint interno opcional para embeddings compartilhados |
+| `EMBEDDING_SERVICE_ENABLED` | Habilita o endpoint apenas no container dedicado |
+| `EMBEDDING_SERVICE_TIMEOUT_SECONDS` | Timeout da chamada ao servico de embeddings |
 | `QDRANT_URL` | URL HTTP do Qdrant |
 | `QDRANT_COLLECTION` | Colecao vetorial dos chunks |
 | `RAG_TOP_K` | Quantidade padrao de resultados semanticos |
@@ -234,9 +247,9 @@ o repositorio substitui seus chunks dentro de uma transacao.
 Comandos uteis:
 
 ```bash
-docker compose up -d postgres
-.venv/bin/python backend/manage.py migrate
-.venv/bin/python backend/manage.py createsuperuser
+docker compose up -d
+docker compose exec api python manage.py migrate
+docker compose exec api python manage.py createsuperuser
 ```
 
 O Django Admin fica disponivel em `http://127.0.0.1:8000/admin/`.
@@ -319,6 +332,12 @@ Quando nenhum contexto e recuperado, a LLM nao e chamada. O prompt instrui o
 modelo a usar apenas o contexto, citar `[Fonte N]` e ignorar instrucoes
 potencialmente maliciosas contidas nos documentos.
 
+## Dashboard
+
+O dashboard possui uma area de consulta com fontes inspecionaveis e uma area de
+documentos para upload, listagem persistente e acompanhamento da indexacao
+assíncrona.
+
 ## Como avaliar o RAG
 
 O dataset inicial fica em `data/evaluation/rag_cases.json`.
@@ -367,11 +386,13 @@ Baseline inicial:
 - [Sprint 5 - Consulta RAG e Maritaca](docs/SPRINT_5.md)
 - [Sprint 6 - Avaliacao minima](docs/SPRINT_6.md)
 - [Sprint 7 - Indexacao assíncrona](docs/SPRINT_7.md)
+- [Sprint 8 - Dashboard inicial](docs/SPRINT_8.md)
+- [Containers e operacao local](docs/CONTAINERS.md)
 - [Plano de sprints](docs/SPRINT_PLAN.md)
 - [Decisoes arquiteturais](docs/ADR.md)
 
 ## Status
 
-Sprint 7 concluida com RabbitMQ, Celery, jobs persistidos, retentativas e
-indexacao vetorial assíncrona validada de ponta a ponta. A proxima etapa prevista
-e o dashboard inicial.
+Sprint 8 concluida com dashboard responsivo, chat RAG, fontes, documentos,
+indexacao assíncrona e testes E2E. A proxima etapa prevista e KPIs e
+observabilidade.

@@ -1,8 +1,10 @@
+from functools import lru_cache
+
 from django.conf import settings
 from qdrant_client import QdrantClient
 
 from apps.documents.models import Document, DocumentStatus
-from apps.rag.embeddings import EmbeddingProvider, FastEmbedProvider
+from apps.rag.embeddings import EmbeddingProvider, FastEmbedProvider, RemoteEmbeddingProvider
 from apps.rag.generation import LLMProvider, MaritacaProvider
 from apps.rag.prompting import PromptBuilder
 from apps.rag.vector_store import QdrantVectorStore, SearchResult, VectorStore
@@ -98,11 +100,22 @@ class RAGQueryService:
         }
 
 
+@lru_cache(maxsize=1)
 def build_services() -> tuple[DocumentIndexingService, SemanticSearchService]:
-    embeddings = FastEmbedProvider(
-        model_name=settings.EMBEDDING_MODEL,
-        dimension=settings.EMBEDDING_DIMENSION,
-    )
+    if settings.EMBEDDING_SERVICE_URL:
+        embeddings = RemoteEmbeddingProvider(
+            url=settings.EMBEDDING_SERVICE_URL,
+            dimension=settings.EMBEDDING_DIMENSION,
+            timeout_seconds=settings.EMBEDDING_SERVICE_TIMEOUT_SECONDS,
+        )
+    else:
+        embeddings = FastEmbedProvider(
+            model_name=settings.EMBEDDING_MODEL,
+            dimension=settings.EMBEDDING_DIMENSION,
+            cache_dir=settings.EMBEDDING_CACHE_DIR,
+            threads=settings.EMBEDDING_THREADS,
+            enable_cpu_mem_arena=settings.EMBEDDING_ENABLE_CPU_MEM_ARENA,
+        )
     vector_store = QdrantVectorStore(
         client=QdrantClient(url=settings.QDRANT_URL),
         collection_name=settings.QDRANT_COLLECTION,
@@ -114,6 +127,7 @@ def build_services() -> tuple[DocumentIndexingService, SemanticSearchService]:
     )
 
 
+@lru_cache(maxsize=1)
 def build_rag_query_service() -> RAGQueryService:
     _, search_service = build_services()
     llm = MaritacaProvider(

@@ -310,3 +310,70 @@ recuperadas. O PostgreSQL fornece historico consultavel mesmo sem backend de
 resultados Celery. Em contrapartida, o ambiente passa a exigir RabbitMQ e ao
 menos um worker ativo. Jobs interrompidos durante `processing` ainda exigirao
 uma politica futura de deteccao e reenvio.
+
+## ADR: Dashboard Next.js com proxy para a API Django
+
+### Status
+
+Aceito e implementado na Sprint 8.
+
+### Contexto
+
+O dashboard precisa consumir upload, jobs e consultas RAG no navegador. Acesso
+direto ao Django exigiria configuracao CORS e exporia dois destinos ao cliente.
+
+### Decisao
+
+Usar Next.js 16 com React 19 e Tailwind CSS 4. Requisicoes usam o prefixo
+`/backend-api`, encaminhado por uma rota proxy do Next.js para a API definida em
+`API_BASE_URL`. A rota explicita preserva uploads e consultas RAG longas.
+
+### Alternativas consideradas
+
+- CORS direto entre Next.js e Django: simples, mas adiciona configuracao antes
+  da sprint de seguranca.
+- Templates Django: reduzem componentes, mas limitam a evolucao interativa.
+- Next.js como BFF completo: flexivel, mas duplicaria contratos no MVP.
+
+### Consequencias
+
+O navegador acessa uma origem unica e o destino da API pode mudar por ambiente.
+O dashboard passa a depender do servidor Next.js para encaminhar chamadas.
+
+## ADR: Compose full-stack com redes segmentadas
+
+### Status
+
+Aceito e implementado no adendo de infraestrutura da Sprint 8.
+
+### Contexto
+
+O ambiente local exigia processos iniciados manualmente e expunha servicos de
+dados que so precisam ser acessados pela aplicacao. API e worker tambem possuem
+as mesmas dependencias Python e nao justificam imagens diferentes.
+
+### Decisao
+
+Executar frontend, API, worker, servico de embeddings, PostgreSQL, Qdrant e
+RabbitMQ pelo Docker Compose. API, worker e embeddings compartilham
+`adaptive-rag-backend:local`; o frontend usa build standalone. Somente portas
+`3000` e `8000` sao publicadas. Bancos, broker e embeddings ficam na rede
+interna `backend`, enquanto `app` conecta os componentes da aplicacao e permite
+chamadas externas. O servico de embeddings mantem uma unica copia ONNX para
+evitar disputa de memoria entre API e worker.
+
+### Alternativas consideradas
+
+- Expor todos os servicos no host: facilita diagnostico manual, mas amplia a
+  superficie local e enfraquece o isolamento.
+- Uma imagem por processo backend: permite customizacao isolada, mas duplica
+  build e armazenamento sem necessidade atual.
+- Kubernetes local: oferece mais recursos operacionais, mas seria
+  desproporcional ao MVP.
+
+### Consequencias
+
+O ambiente passa a subir com um comando, possui health checks, persistencia e
+isolamento coerentes. API, worker e frontend executam sem privilegios. Para
+acessar diretamente PostgreSQL, Qdrant ou RabbitMQ a partir do host, sera
+necessario um override Compose temporario.

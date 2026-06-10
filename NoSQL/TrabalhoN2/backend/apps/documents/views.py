@@ -1,10 +1,12 @@
 from rest_framework import status
+from django.db.models import Count
 from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from apps.documents.serializers import DocumentIngestionSerializer
+from apps.documents.models import Document
+from apps.documents.serializers import DocumentIngestionSerializer, DocumentSummarySerializer
 from apps.documents.services import DocumentIngestionError, DocumentIngestionService
 
 
@@ -41,3 +43,12 @@ class DocumentIngestionView(APIView):
             },
             status=status.HTTP_201_CREATED if result.created else status.HTTP_200_OK,
         )
+
+
+class DocumentListView(APIView):
+    authentication_classes = []
+    permission_classes = []
+
+    def get(self, request: Request) -> Response:
+        documents = Document.objects.annotate(chunk_count=Count("chunks"))[:100]
+        return Response(DocumentSummarySerializer(documents, many=True).data)

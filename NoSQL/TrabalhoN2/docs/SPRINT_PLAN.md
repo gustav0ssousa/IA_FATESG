@@ -136,6 +136,9 @@ Escopo previsto:
 
 Objetivo: criar dashboard para chat e visualizacao de fontes.
 
+Status: concluida com Next.js 16, Tailwind CSS 4, chat RAG, painel de fontes,
+gestao de documentos e validacao E2E responsiva.
+
 Escopo previsto:
 
 - Next.js + Tailwind.

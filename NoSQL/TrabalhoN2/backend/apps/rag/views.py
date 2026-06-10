@@ -1,6 +1,8 @@
 import uuid
+from functools import lru_cache
 
 from django.conf import settings
+from django.http import Http404
 from django.shortcuts import get_object_or_404
 from rest_framework import status
 from rest_framework.request import Request
@@ -9,9 +11,11 @@ from rest_framework.views import APIView
 
 from apps.documents.models import Document
 from apps.rag.async_indexing import AsyncIndexingError, AsyncIndexingService
+from apps.rag.embeddings import FastEmbedProvider
 from apps.rag.models import IndexingJob
 from apps.rag.serializers import (
     IndexingJobSerializer,
+    EmbeddingRequestSerializer,
     RAGQuerySerializer,
     SemanticSearchSerializer,
 )
@@ -21,6 +25,35 @@ from apps.rag.services import (
     build_rag_query_service,
     build_services,
 )
+
+
+@lru_cache(maxsize=1)
+def build_local_embedding_provider() -> FastEmbedProvider:
+    return FastEmbedProvider(
+        model_name=settings.EMBEDDING_MODEL,
+        dimension=settings.EMBEDDING_DIMENSION,
+        cache_dir=settings.EMBEDDING_CACHE_DIR,
+        threads=settings.EMBEDDING_THREADS,
+        enable_cpu_mem_arena=settings.EMBEDDING_ENABLE_CPU_MEM_ARENA,
+    )
+
+
+class InternalEmbeddingView(APIView):
+    authentication_classes = []
+    permission_classes = []
+
+    def post(self, request: Request) -> Response:
+        if not settings.EMBEDDING_SERVICE_ENABLED:
+            raise Http404
+        serializer = EmbeddingRequestSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        provider = build_local_embedding_provider()
+        texts = serializer.validated_data["texts"]
+        if serializer.validated_data["mode"] == "query":
+            vectors = [provider.embed_query(texts[0])]
+        else:
+            vectors = provider.embed_documents(texts)
+        return Response({"vectors": vectors, "dimension": provider.dimension})
 
 
 class DocumentIndexView(APIView):

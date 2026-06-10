@@ -10,3 +10,8 @@ htmlcov/
 outputs/
 .idea/
 .vscode/
+frontend/node_modules/
+frontend/.next/
+frontend/.env.local
+frontend/playwright-report/
+frontend/test-results/

@@ -13,6 +13,20 @@ class RAGQuerySerializer(serializers.Serializer):
     top_k = serializers.IntegerField(required=False, min_value=1, max_value=20)
 
 
+class EmbeddingRequestSerializer(serializers.Serializer):
+    mode = serializers.ChoiceField(choices=("documents", "query"))
+    texts = serializers.ListField(
+        child=serializers.CharField(max_length=20000),
+        min_length=1,
+        max_length=100,
+    )
+
+    def validate(self, attrs):
+        if attrs["mode"] == "query" and len(attrs["texts"]) != 1:
+            raise serializers.ValidationError("O modo query aceita exatamente um texto.")
+        return attrs
+
+
 class IndexingJobSerializer(serializers.ModelSerializer):
     document_id = serializers.UUIDField(read_only=True)
 

@@ -4,6 +4,7 @@ from django.conf import settings
 from rest_framework import serializers
 
 from apps.documents.extractors import ExtractorRegistry
+from apps.documents.models import Document
 
 
 class DocumentIngestionSerializer(serializers.Serializer):
@@ -21,3 +22,21 @@ class DocumentIngestionSerializer(serializers.Serializer):
         if uploaded_file.size == 0:
             raise serializers.ValidationError("O arquivo esta vazio.")
         return uploaded_file
+
+
+class DocumentSummarySerializer(serializers.ModelSerializer):
+    chunk_count = serializers.IntegerField(read_only=True)
+
+    class Meta:
+        model = Document
+        fields = (
+            "id",
+            "title",
+            "source_name",
+            "source_type",
+            "status",
+            "chunk_count",
+            "created_at",
+            "updated_at",
+        )
+        read_only_fields = fields
