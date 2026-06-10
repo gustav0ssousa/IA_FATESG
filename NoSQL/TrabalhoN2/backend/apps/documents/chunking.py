@@ -6,6 +6,7 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 
 from apps.documents.extractors import ExtractedSection
 from apps.documents.repositories import ChunkData
+from apps.documents.technical import classify_technical_chunk
 
 
 def normalize_text(text: str) -> str:
@@ -48,7 +49,21 @@ class LangChainTextChunker:
                         "content_hash": hashlib.sha256(content.encode()).hexdigest(),
                         "token_count": None,
                         "page_number": section.page_number,
-                        "metadata": section.metadata,
+                        "metadata": {
+                            **section.metadata,
+                            **classify_technical_chunk(
+                                "\n".join(
+                                    filter(
+                                        None,
+                                        (
+                                            section.metadata.get("chapter", ""),
+                                            section.metadata.get("section_heading", ""),
+                                            content,
+                                        ),
+                                    )
+                                )
+                            ),
+                        },
                     }
                 )
         return chunks

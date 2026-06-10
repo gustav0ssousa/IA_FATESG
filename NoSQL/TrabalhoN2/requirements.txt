@@ -3,6 +3,8 @@ djangorestframework==3.16.1
 django-environ==0.12.1
 psycopg[binary]==3.2.13
 pypdf==6.13.1
+cryptography==48.0.1
+PyMuPDF==1.27.2.3
 langchain-text-splitters==1.1.2
 qdrant-client==1.18.0
 fastembed==0.8.0

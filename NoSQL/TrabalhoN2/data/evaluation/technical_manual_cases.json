@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "domain": "printer_scanner_technical_support",
+  "source_document": "sm_elfb_e_ver2.pdf",
+  "cases": [
+    {
+      "id": "brother-pre-troubleshooting-paper",
+      "question": "O que deve ser verificado no papel antes de iniciar o troubleshooting?",
+      "expected_sources": ["sm_elfb_e_ver2.pdf"],
+      "expected_answer_terms": ["papel recomendado", "úmido"],
+      "answerable": true
+    },
+    {
+      "id": "brother-condensation-wait",
+      "question": "Quanto tempo a máquina deve permanecer em repouso após ocorrer condensação?",
+      "expected_sources": ["sm_elfb_e_ver2.pdf"],
+      "expected_answer_terms": ["duas horas", "temperatura ambiente"],
+      "answerable": true
+    },
+    {
+      "id": "brother-cleaning-safety",
+      "question": "Quais produtos não devem ser usados para limpar a máquina?",
+      "expected_sources": ["sm_elfb_e_ver2.pdf"],
+      "expected_answer_terms": ["spray inflamável", "álcool", "benzina"],
+      "answerable": true
+    },
+    {
+      "id": "unsupported-model-refusal",
+      "question": "Como substituir a cabeça de impressão da Epson L3250?",
+      "expected_sources": [],
+      "expected_answer_terms": [],
+      "answerable": false
+    }
+  ]
+}

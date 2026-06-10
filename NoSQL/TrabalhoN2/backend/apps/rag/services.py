@@ -42,8 +42,16 @@ class SemanticSearchService:
         self._embeddings = embeddings
         self._vector_store = vector_store
 
-    def search(self, query: str, top_k: int) -> list[SearchResult]:
-        return self._vector_store.search(self._embeddings.embed_query(query), top_k)
+    def search(
+        self,
+        query: str,
+        top_k: int,
+        filters: dict | None = None,
+    ) -> list[SearchResult]:
+        vector = self._embeddings.embed_query(query)
+        if filters:
+            return self._vector_store.search(vector, top_k, filters=filters)
+        return self._vector_store.search(vector, top_k)
 
 
 class RAGQueryError(RuntimeError):
@@ -61,9 +69,13 @@ class RAGQueryService:
         self._prompt_builder = prompt_builder
         self._llm = llm
 
-    def answer(self, question: str, top_k: int) -> dict:
+    def answer(self, question: str, top_k: int, filters: dict | None = None) -> dict:
         try:
-            results = self._search_service.search(question, top_k)
+            results = (
+                self._search_service.search(question, top_k, filters=filters)
+                if filters
+                else self._search_service.search(question, top_k)
+            )
             if not results:
                 return {
                     "answer": "Nao encontrei informacao suficiente nos documentos indexados.",

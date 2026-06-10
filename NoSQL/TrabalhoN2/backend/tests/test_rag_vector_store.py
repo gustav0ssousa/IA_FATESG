@@ -106,6 +106,28 @@ def test_semantic_search_returns_most_relevant_chunk() -> None:
     assert results[0].source_name == "arquitetura.md"
 
 
+def test_semantic_search_filters_technical_metadata() -> None:
+    document = make_document_with_chunks()
+    document.chunks.filter(position=0).update(
+        metadata={"manufacturer": "Brother", "models": ["MFC-L5710DN"]}
+    )
+    document.chunks.filter(position=1).update(
+        metadata={"manufacturer": "Epson", "models": ["L3250"]}
+    )
+    embeddings = FakeEmbeddingProvider()
+    vector_store = make_vector_store()
+    DocumentIndexingService(embeddings, vector_store).index(document)
+
+    results = SemanticSearchService(embeddings, vector_store).search(
+        "RAG PostgreSQL",
+        5,
+        filters={"manufacturer": "Brother", "models": "MFC-L5710DN"},
+    )
+
+    assert len(results) == 1
+    assert results[0].metadata["manufacturer"] == "Brother"
+
+
 def test_reindexing_replaces_old_document_vectors() -> None:
     document = make_document_with_chunks()
     embeddings = FakeEmbeddingProvider()

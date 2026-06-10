@@ -3,6 +3,7 @@ from io import BytesIO
 from pathlib import Path
 from typing import Protocol
 
+import pymupdf
 from pypdf import PdfReader
 
 
@@ -33,17 +34,28 @@ class PlainTextExtractor:
 class PdfTextExtractor:
     def extract(self, content: bytes) -> list[ExtractedSection]:
         try:
-            reader = PdfReader(BytesIO(content))
+            document = pymupdf.open(stream=content, filetype="pdf")
             sections = [
                 ExtractedSection(
-                    text=page.extract_text() or "",
+                    text=page.get_text("text", sort=True) or "",
                     page_number=index,
                     metadata={"page_number": index},
                 )
-                for index, page in enumerate(reader.pages, start=1)
+                for index, page in enumerate(document, start=1)
             ]
         except Exception as error:
-            raise DocumentExtractionError("Nao foi possivel extrair o PDF.") from error
+            try:
+                reader = PdfReader(BytesIO(content))
+                sections = [
+                    ExtractedSection(
+                        text=page.extract_text() or "",
+                        page_number=index,
+                        metadata={"page_number": index},
+                    )
+                    for index, page in enumerate(reader.pages, start=1)
+                ]
+            except Exception as fallback_error:
+                raise DocumentExtractionError("Nao foi possivel extrair o PDF.") from fallback_error
 
         if not any(section.text.strip() for section in sections):
             raise DocumentExtractionError(

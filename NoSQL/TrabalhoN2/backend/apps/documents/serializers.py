@@ -10,6 +10,23 @@ from apps.documents.models import Document
 class DocumentIngestionSerializer(serializers.Serializer):
     file = serializers.FileField()
     title = serializers.CharField(required=False, allow_blank=True, max_length=255)
+    manufacturer = serializers.CharField(required=False, allow_blank=True, max_length=100)
+    models = serializers.CharField(required=False, allow_blank=True, max_length=1000)
+    equipment_type = serializers.ChoiceField(
+        required=False,
+        choices=("printer", "scanner", "multifunction", "other"),
+    )
+    manual_type = serializers.ChoiceField(
+        required=False,
+        choices=(
+            "service_manual",
+            "user_manual",
+            "installation_manual",
+            "parts_catalog",
+            "technical_document",
+        ),
+    )
+    language = serializers.CharField(required=False, allow_blank=True, max_length=20)
 
     def validate_file(self, uploaded_file):
         extension = Path(uploaded_file.name).suffix.lower()
@@ -35,6 +52,7 @@ class DocumentSummarySerializer(serializers.ModelSerializer):
             "source_name",
             "source_type",
             "status",
+            "metadata",
             "chunk_count",
             "created_at",
             "updated_at",

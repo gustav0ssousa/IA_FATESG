@@ -9,8 +9,14 @@ env = environ.Env(
     DJANGO_DEBUG=(bool, False),
     DJANGO_ALLOWED_HOSTS=(list, ["localhost", "127.0.0.1"]),
     DJANGO_ENVIRONMENT=(str, "local"),
+    DJANGO_SECURE_SSL_REDIRECT=(bool, False),
+    DJANGO_SECURE_COOKIES=(bool, False),
     DATABASE_URL=(str, f"sqlite:///{BASE_DIR / 'db.sqlite3'}"),
-    DOCUMENT_MAX_UPLOAD_SIZE=(int, 10 * 1024 * 1024),
+    API_ACCESS_KEY=(str, ""),
+    API_REQUIRE_AUTHENTICATION=(bool, False),
+    API_ANON_THROTTLE_RATE=(str, "120/min"),
+    API_USER_THROTTLE_RATE=(str, "600/min"),
+    DOCUMENT_MAX_UPLOAD_SIZE=(int, 75 * 1024 * 1024),
     RAG_CHUNK_SIZE=(int, 1200),
     RAG_CHUNK_OVERLAP=(int, 200),
     EMBEDDING_MODEL=(str, "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"),
@@ -34,6 +40,7 @@ env = environ.Env(
     MARITACA_MAX_RETRIES=(int, 2),
     CELERY_BROKER_URL=(str, "amqp://rag_user:rag_password@localhost:5672//"),
     CELERY_INDEXING_MAX_RETRIES=(int, 3),
+    OBSERVABILITY_EXPOSE_QUESTION_TEXT=(bool, False),
 )
 environ.Env.read_env(PROJECT_ROOT / ".env")
 
@@ -41,6 +48,10 @@ SECRET_KEY = env("DJANGO_SECRET_KEY", default="unsafe-local-development-key")
 DEBUG = env("DJANGO_DEBUG")
 ALLOWED_HOSTS = env("DJANGO_ALLOWED_HOSTS")
 ENVIRONMENT = env("DJANGO_ENVIRONMENT")
+API_ACCESS_KEY = env("API_ACCESS_KEY")
+API_REQUIRE_AUTHENTICATION = env("API_REQUIRE_AUTHENTICATION")
+API_ANON_THROTTLE_RATE = env("API_ANON_THROTTLE_RATE")
+API_USER_THROTTLE_RATE = env("API_USER_THROTTLE_RATE")
 DOCUMENT_MAX_UPLOAD_SIZE = env("DOCUMENT_MAX_UPLOAD_SIZE")
 RAG_CHUNK_SIZE = env("RAG_CHUNK_SIZE")
 RAG_CHUNK_OVERLAP = env("RAG_CHUNK_OVERLAP")
@@ -65,6 +76,16 @@ MARITACA_TIMEOUT_SECONDS = env("MARITACA_TIMEOUT_SECONDS")
 MARITACA_MAX_RETRIES = env("MARITACA_MAX_RETRIES")
 CELERY_BROKER_URL = env("CELERY_BROKER_URL")
 CELERY_INDEXING_MAX_RETRIES = env("CELERY_INDEXING_MAX_RETRIES")
+OBSERVABILITY_EXPOSE_QUESTION_TEXT = env("OBSERVABILITY_EXPOSE_QUESTION_TEXT")
+
+SECURE_CONTENT_TYPE_NOSNIFF = True
+SECURE_REFERRER_POLICY = "same-origin"
+X_FRAME_OPTIONS = "DENY"
+SESSION_COOKIE_HTTPONLY = True
+CSRF_COOKIE_HTTPONLY = True
+SECURE_SSL_REDIRECT = env("DJANGO_SECURE_SSL_REDIRECT")
+SESSION_COOKIE_SECURE = env("DJANGO_SECURE_COOKIES")
+CSRF_COOKIE_SECURE = env("DJANGO_SECURE_COOKIES")
 
 CELERY_TASK_SERIALIZER = "json"
 CELERY_ACCEPT_CONTENT = ["json"]
@@ -82,6 +103,7 @@ INSTALLED_APPS = [
     "django.contrib.messages",
     "django.contrib.staticfiles",
     "rest_framework",
+    "rest_framework.authtoken",
     "apps.common",
     "apps.documents",
     "apps.rag",
@@ -89,6 +111,7 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
+    "apps.common.middleware.RequestLoggingMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
@@ -143,9 +166,42 @@ STATIC_URL = "static/"
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 REST_FRAMEWORK = {
+    "EXCEPTION_HANDLER": "apps.common.exceptions.api_exception_handler",
     "DEFAULT_RENDERER_CLASSES": ["rest_framework.renderers.JSONRenderer"],
+    "DEFAULT_AUTHENTICATION_CLASSES": [
+        "rest_framework.authentication.TokenAuthentication",
+    ],
     "DEFAULT_PARSER_CLASSES": [
         "rest_framework.parsers.JSONParser",
         "rest_framework.parsers.MultiPartParser",
     ],
+    "DEFAULT_THROTTLE_CLASSES": [
+        "rest_framework.throttling.AnonRateThrottle",
+        "rest_framework.throttling.UserRateThrottle",
+    ],
+    "DEFAULT_THROTTLE_RATES": {
+        "anon": API_ANON_THROTTLE_RATE,
+        "user": API_USER_THROTTLE_RATE,
+    },
+}
+
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "formatters": {
+        "json": {"()": "apps.common.logging.JsonFormatter"},
+    },
+    "handlers": {
+        "console_json": {
+            "class": "logging.StreamHandler",
+            "formatter": "json",
+        },
+    },
+    "loggers": {
+        "adaptive_rag": {
+            "handlers": ["console_json"],
+            "level": "INFO",
+            "propagate": False,
+        },
+    },
 }

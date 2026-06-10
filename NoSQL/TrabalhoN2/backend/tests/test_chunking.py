@@ -25,7 +25,8 @@ def test_chunker_preserves_page_metadata_and_sequential_positions() -> None:
     assert len(chunks) > 1
     assert [chunk["position"] for chunk in chunks] == list(range(len(chunks)))
     assert all(chunk["page_number"] == 2 for chunk in chunks)
-    assert all(chunk["metadata"] == {"section": "intro"} for chunk in chunks)
+    assert all(chunk["metadata"]["section"] == "intro" for chunk in chunks)
+    assert all(chunk["metadata"]["content_type"] for chunk in chunks)
 
 
 def test_chunking_config_rejects_overlap_greater_than_size() -> None:

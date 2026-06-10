@@ -9,6 +9,10 @@ from apps.documents.chunking import ChunkingConfig, LangChainTextChunker
 from apps.documents.extractors import DocumentExtractionError, ExtractorRegistry
 from apps.documents.models import Document, DocumentStatus
 from apps.documents.repositories import DocumentRepository
+from apps.documents.technical import (
+    enrich_technical_sections,
+    infer_technical_document_metadata,
+)
 
 
 class DocumentIngestionError(ValueError):
@@ -22,7 +26,12 @@ class IngestionResult:
 
 
 class DocumentIngestionService:
-    def ingest(self, uploaded_file: UploadedFile, title: str = "") -> IngestionResult:
+    def ingest(
+        self,
+        uploaded_file: UploadedFile,
+        title: str = "",
+        metadata: dict | None = None,
+    ) -> IngestionResult:
         content = uploaded_file.read()
         content_hash = hashlib.sha256(content).hexdigest()
         existing = DocumentRepository.get_by_content_hash(content_hash)
@@ -36,11 +45,19 @@ class DocumentIngestionService:
             source_type=Path(source_name).suffix.lower().lstrip("."),
             content_hash=content_hash,
             status=DocumentStatus.PROCESSING,
-            metadata={"file_size": len(content)},
+            metadata={"file_size": len(content), **(metadata or {})},
         )
 
         try:
             sections = ExtractorRegistry.get_for_filename(source_name).extract(content)
+            inferred_metadata = infer_technical_document_metadata(sections, source_name)
+            document.metadata = {
+                **inferred_metadata,
+                **document.metadata,
+            }
+            if not title.strip() and inferred_metadata["suggested_title"]:
+                document.title = inferred_metadata["suggested_title"]
+            sections = enrich_technical_sections(sections, document.metadata)
             chunker = LangChainTextChunker(
                 ChunkingConfig(
                     chunk_size=settings.RAG_CHUNK_SIZE,
@@ -53,7 +70,9 @@ class DocumentIngestionService:
             DocumentRepository.replace_chunks(document, chunks)
             document.status = DocumentStatus.CHUNKED
             document.error_message = ""
-            document.save(update_fields=["status", "error_message", "updated_at"])
+            document.save(
+                update_fields=["title", "metadata", "status", "error_message", "updated_at"]
+            )
         except (DocumentExtractionError, ValueError) as error:
             document.status = DocumentStatus.FAILED
             document.error_message = str(error)

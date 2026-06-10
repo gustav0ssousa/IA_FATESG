@@ -66,7 +66,14 @@ Endpoints publicados:
 
 O dashboard encaminha `/backend-api/*` por uma rota proxy propria. Ela preserva
 uploads e aguarda chamadas RAG que podem ultrapassar o timeout de proxies
-automaticos.
+automaticos. Quando `API_ACCESS_KEY` esta configurada, o proxy injeta a chave
+somente no servidor enquanto `API_REQUIRE_AUTHENTICATION=False`; ela nao e
+enviada ao JavaScript do navegador. Quando login individual esta ativo, o proxy
+preserva o token do usuario e nao injeta a chave administrativa.
+
+Credenciais locais de PostgreSQL e RabbitMQ sao configuradas por variaveis no
+`.env`. Os valores padrao do Compose servem apenas para desenvolvimento e devem
+ser trocados em qualquer ambiente compartilhado.
 
 ## Operacao
 

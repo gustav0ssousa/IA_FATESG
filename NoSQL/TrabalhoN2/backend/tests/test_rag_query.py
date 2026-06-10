@@ -1,5 +1,6 @@
 from unittest.mock import patch
 
+import pytest
 from rest_framework import status
 from rest_framework.test import APIClient
 
@@ -7,6 +8,8 @@ from apps.rag.generation import GenerationResult, MaritacaProvider
 from apps.rag.prompting import PromptBuilder
 from apps.rag.services import RAGQueryService
 from apps.rag.vector_store import SearchResult
+
+pytestmark = pytest.mark.django_db
 
 
 def source(content: str = "RAG recupera contexto relevante.") -> SearchResult:
@@ -141,7 +144,14 @@ def test_maritaca_provider_uses_responses_api_parameters() -> None:
 def test_rag_query_endpoint_returns_request_id_and_sources(build_service_mock) -> None:
     build_service_mock.return_value.answer.return_value = {
         "answer": "Resposta [Fonte 1].",
-        "sources": [{"number": 1, "source_name": "guia.md"}],
+        "sources": [
+            {
+                "number": 1,
+                "document_id": "document-1",
+                "source_name": "guia.md",
+                "score": 0.98,
+            }
+        ],
         "model": "sabia-4",
         "usage": {},
     }

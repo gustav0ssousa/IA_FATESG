@@ -5,6 +5,7 @@ from apps.rag.views import (
     DocumentIndexView,
     IndexingJobDetailView,
     InternalEmbeddingView,
+    KPIOverviewView,
     RAGQueryView,
     SemanticSearchView,
 )
@@ -16,4 +17,5 @@ urlpatterns = [
     path("jobs/<uuid:job_id>", IndexingJobDetailView.as_view()),
     path("search", SemanticSearchView.as_view()),
     path("query", RAGQueryView.as_view()),
+    path("kpis/overview", KPIOverviewView.as_view()),
 ]

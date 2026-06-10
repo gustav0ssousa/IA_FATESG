@@ -1,11 +1,12 @@
 x-backend-common: &backend-common
   image: adaptive-rag-backend:local
+  pull_policy: never
   env_file:
     - .env
   environment: &backend-environment
-    DATABASE_URL: postgresql://rag_user:rag_password@postgres:5432/rag_db
+    DATABASE_URL: postgresql://${POSTGRES_USER:-rag_user}:${POSTGRES_PASSWORD:-rag_password}@postgres:5432/${POSTGRES_DB:-rag_db}
     QDRANT_URL: http://qdrant:6333
-    CELERY_BROKER_URL: amqp://rag_user:rag_password@rabbitmq:5672//
+    CELERY_BROKER_URL: amqp://${RABBITMQ_DEFAULT_USER:-rag_user}:${RABBITMQ_DEFAULT_PASS:-rag_password}@rabbitmq:5672//
     DJANGO_ALLOWED_HOSTS: localhost,127.0.0.1,api,frontend,embeddings
     EMBEDDING_CACHE_DIR: /home/app/.cache/fastembed
     EMBEDDING_SERVICE_URL: http://embeddings:8000/api/rag/internal/embeddings
@@ -20,13 +21,13 @@ services:
   postgres:
     image: postgres:17-alpine
     environment:
-      POSTGRES_DB: rag_db
-      POSTGRES_USER: rag_user
-      POSTGRES_PASSWORD: rag_password
+      POSTGRES_DB: ${POSTGRES_DB:-rag_db}
+      POSTGRES_USER: ${POSTGRES_USER:-rag_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-rag_password}
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U rag_user -d rag_db"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-rag_user} -d ${POSTGRES_DB:-rag_db}"]
       interval: 5s
       timeout: 5s
       retries: 10
@@ -50,8 +51,8 @@ services:
   rabbitmq:
     image: rabbitmq:4.2-management-alpine
     environment:
-      RABBITMQ_DEFAULT_USER: rag_user
-      RABBITMQ_DEFAULT_PASS: rag_password
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_DEFAULT_USER:-rag_user}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_DEFAULT_PASS:-rag_password}
     volumes:
       - rabbitmq_data:/var/lib/rabbitmq
     healthcheck:
@@ -167,6 +168,7 @@ services:
 
   frontend:
     image: adaptive-rag-frontend:local
+    pull_policy: never
     build:
       context: frontend
       dockerfile: Dockerfile
@@ -174,6 +176,8 @@ services:
         API_BASE_URL: http://api:8000
     environment:
       API_BASE_URL: http://api:8000
+      API_ACCESS_KEY: ${API_ACCESS_KEY:-}
+      API_REQUIRE_AUTHENTICATION: ${API_REQUIRE_AUTHENTICATION:-False}
     ports:
       - "3000:3000"
     depends_on:

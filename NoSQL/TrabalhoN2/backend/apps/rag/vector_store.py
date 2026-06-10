@@ -25,7 +25,12 @@ class VectorStore(Protocol):
         vectors: Sequence[list[float]],
     ) -> None: ...
 
-    def search(self, vector: list[float], top_k: int) -> list[SearchResult]: ...
+    def search(
+        self,
+        vector: list[float],
+        top_k: int,
+        filters: dict | None = None,
+    ) -> list[SearchResult]: ...
 
 
 class QdrantVectorStore:
@@ -93,11 +98,28 @@ class QdrantVectorStore:
             ],
         )
 
-    def search(self, vector: list[float], top_k: int) -> list[SearchResult]:
+    def search(
+        self,
+        vector: list[float],
+        top_k: int,
+        filters: dict | None = None,
+    ) -> list[SearchResult]:
         self.ensure_collection()
+        query_filter = None
+        if filters:
+            query_filter = models.Filter(
+                must=[
+                    models.FieldCondition(
+                        key=f"metadata.{key}",
+                        match=models.MatchValue(value=value),
+                    )
+                    for key, value in filters.items()
+                ]
+            )
         response = self._client.query_points(
             collection_name=self._collection_name,
             query=vector,
+            query_filter=query_filter,
             limit=top_k,
             with_payload=True,
         )

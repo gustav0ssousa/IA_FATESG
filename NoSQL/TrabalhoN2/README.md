@@ -1,7 +1,9 @@
 # Sistema RAG Adaptativo - Trabalho N2
 
-Este projeto sera desenvolvido em sprints para criar um sistema RAG
-(`Retrieval-Augmented Generation`) funcional, modular, testavel e evolutivo.
+Este projeto desenvolve um sistema RAG (`Retrieval-Augmented Generation`)
+funcional, modular e testavel, especializado inicialmente em suporte tecnico
+baseado em manuais de impressoras e scanners. A arquitetura preserva expansao
+para outros equipamentos e tecnologias.
 
 ## Stack planejada
 
@@ -14,16 +16,16 @@ Este projeto sera desenvolvido em sprints para criar um sistema RAG
 | Modelo de embedding | A definir na implementacao; preferencia por modelo multilíngue adequado a portugues |
 | Banco vetorial | Qdrant |
 | Banco relacional/documental | PostgreSQL |
-| Orquestracao RAG | LangChain planejado, usado de forma isolada atras de servicos proprios |
-| Sistema de autenticacao | Django Auth; JWT/API key previsto para a API |
+| Orquestracao RAG | Servicos proprios; `langchain-text-splitters` isolado no chunking |
+| Sistema de autenticacao | Django Auth + tokens DRF opcionais; chave de API para integracoes |
 | Infra/deploy | Docker Compose local; producao a definir |
-| Observabilidade/logs | Logs estruturados no backend; metricas basicas em fase posterior |
+| Observabilidade/logs | Logs JSON, histórico de queries e KPIs operacionais no dashboard |
 | Ambiente local | Pilha completa em Docker Compose; virtualenv opcional para desenvolvimento |
 | Ambiente producao | A definir; recomendacao futura: VPS/cloud com containers |
-| Tipo de dados indexados | Documentos textuais e arquivos academicos/administrativos |
+| Tipo de dados indexados | Manuais tecnicos, guias de servico, troubleshooting e documentos gerais |
 | Formatos de arquivos | MVP: `.txt`, `.md` e `.pdf`; futuro: `.docx`, `.csv`, paginas web |
-| Volume estimado de dados | Baixo a medio no MVP; arquitetura preparada para crescimento incremental |
-| Usuarios finais | Estudantes, avaliadores e usuarios internos consultando conhecimento indexado |
+| Volume estimado de dados | Manuais extensos; exemplo validado com 513 paginas e 50 MB |
+| Usuarios finais | Tecnicos, suporte, operadores e usuarios consultando procedimentos fundamentados |
 | Restricoes de custo | Priorizar MVP local e servicos com custo controlado |
 | Restricoes de privacidade/compliance | Proteger chaves, evitar logar conteudo sensivel e preservar metadados de origem |
 
@@ -32,6 +34,10 @@ Este projeto sera desenvolvido em sprints para criar um sistema RAG
 Construir uma API RAG que permita indexar documentos, consultar uma pergunta em
 linguagem natural, recuperar os trechos mais relevantes e gerar uma resposta
 fundamentada com fontes.
+
+O foco inicial e responder duvidas de diagnostico, erros, manutencao,
+especificacoes e procedimentos de impressoras/scanners sem misturar orientacoes
+de modelos diferentes e preservando alertas de seguranca.
 
 ## Arquitetura proposta
 
@@ -65,6 +71,10 @@ uma unica instancia do modelo ONNX.
 LangChain podera ser usado para integrar loaders, splitters, retrievers, prompts
 e chamadas de modelos. Regras de negocio, contratos da API e persistencia nao
 devem depender diretamente dele, reduzindo o custo de uma troca futura.
+
+No MVP, somente `langchain-text-splitters` foi adotado. Retrieval, prompting e
+providers permanecem em servicos proprios porque uma chain completa nao trouxe
+ganho proporcional para o fluxo linear atual.
 
 ## Decisao de stack
 
@@ -144,6 +154,7 @@ Configuracao:
 ```bash
 cd NoSQL/TrabalhoN2
 cp .env.example .env
+# Preencha MARITACA_API_KEY e defina API_ACCESS_KEY em ambientes compartilhados.
 docker compose up -d --build
 docker compose ps
 ```
@@ -207,8 +218,14 @@ docker compose exec api python manage.py check
 | `DJANGO_SECRET_KEY` | Chave secreta do Django |
 | `DJANGO_ALLOWED_HOSTS` | Hosts aceitos, separados por virgula |
 | `DJANGO_ENVIRONMENT` | Nome do ambiente retornado no health check |
+| `DJANGO_SECURE_SSL_REDIRECT` | Forca HTTPS quando o ambiente possui TLS |
+| `DJANGO_SECURE_COOKIES` | Restringe cookies de sessao e CSRF a HTTPS |
+| `API_ACCESS_KEY` | Chave compartilhada opcional exigida pelas APIs publicas |
+| `API_REQUIRE_AUTHENTICATION` | Exige login/token ou chave de API quando `True` |
+| `API_ANON_THROTTLE_RATE` | Limite de requisicoes anonimas do DRF |
+| `API_USER_THROTTLE_RATE` | Limite de requisicoes autenticadas do DRF |
 | `DATABASE_URL` | Conexao principal com PostgreSQL |
-| `DOCUMENT_MAX_UPLOAD_SIZE` | Tamanho maximo do upload em bytes |
+| `DOCUMENT_MAX_UPLOAD_SIZE` | Tamanho maximo do upload em bytes; padrao 75 MB |
 | `RAG_CHUNK_SIZE` | Tamanho alvo de cada chunk em caracteres |
 | `RAG_CHUNK_OVERLAP` | Sobreposicao entre chunks em caracteres |
 | `EMBEDDING_MODEL` | Modelo local usado pelo FastEmbed |
@@ -232,6 +249,40 @@ docker compose exec api python manage.py check
 | `MARITACA_MAX_RETRIES` | Retentativas automaticas da chamada |
 | `CELERY_BROKER_URL` | Conexao AMQP usada pelo Celery |
 | `CELERY_INDEXING_MAX_RETRIES` | Retentativas de um job de indexacao |
+| `OBSERVABILITY_EXPOSE_QUESTION_TEXT` | Exibe perguntas no endpoint de KPIs quando `True` |
+
+Quando `API_ACCESS_KEY` estiver preenchida, chamadas diretas a API devem incluir:
+
+```bash
+-H "X-API-Key: $API_ACCESS_KEY"
+```
+
+O dashboard injeta essa chave no proxy server-side. O health check e o endpoint
+interno de embeddings nao usam a chave; o segundo permanece acessivel apenas na
+rede interna do Compose.
+
+## Autenticacao e papeis
+
+Para exigir identidade individual, configure:
+
+```dotenv
+API_REQUIRE_AUTHENTICATION=True
+```
+
+Crie usuarios pelo Django Admin ou pelo terminal:
+
+```bash
+docker compose exec api python manage.py createsuperuser
+```
+
+O dashboard passa a exibir login e envia o token DRF nas requisicoes. Usuarios
+comuns podem consultar o RAG, listar documentos e acompanhar jobs. Usuarios
+`staff` tambem podem ingerir/indexar documentos e visualizar KPIs. A
+`API_ACCESS_KEY` continua disponivel para integracoes de servico com acesso
+administrativo.
+
+Endpoints: `GET /api/auth/config`, `POST /api/auth/login`,
+`GET /api/auth/me` e `POST /api/auth/logout`.
 
 ## Persistencia estruturada
 
@@ -274,6 +325,27 @@ O pipeline atual:
 6. Persiste documento e chunks.
 
 PDFs baseados apenas em imagem ainda exigem OCR e retornam erro controlado.
+PDFs protegidos que permitem extracao sao suportados por PyMuPDF, com fallback
+para `pypdf`.
+
+### Metadados tecnicos
+
+Para manuais, o sistema infere fabricante, modelos, tipo de equipamento, tipo de
+manual, idioma, paginas, capitulos, secoes, codigos de erro e nivel de seguranca.
+Os campos principais tambem podem ser informados no upload:
+
+```bash
+curl -X POST http://127.0.0.1:8000/api/documents/ingest \
+  -F "file=@docs/sm_elfb_e_ver2.pdf" \
+  -F "manufacturer=Brother" \
+  -F "models=MFC-L5710DN,MFC-L5715DW" \
+  -F "equipment_type=multifunction" \
+  -F "manual_type=service_manual" \
+  -F "language=en"
+```
+
+Detalhes do domínio e da análise do manual estão em
+[Manuais técnicos](docs/TECHNICAL_MANUALS.md).
 
 ## Como indexar no Qdrant
 
@@ -310,6 +382,15 @@ curl -X POST http://127.0.0.1:8000/api/rag/search \
 A resposta retorna score, texto do chunk, fonte, pagina e metadados. A geracao
 de resposta com LLM esta disponivel no endpoint de consulta RAG.
 
+Busca e consulta aceitam filtros opcionais: `manufacturer`, `model`,
+`equipment_type`, `manual_type` e `content_type`. Exemplo:
+
+```bash
+curl -X POST http://127.0.0.1:8000/api/rag/query \
+  -H "Content-Type: application/json" \
+  -d '{"question":"Quais verificações fazer para erro de alimentação?","manufacturer":"Brother","model":"MFC-L5710DN","content_type":"troubleshooting"}'
+```
+
 ## Como consultar o RAG
 
 Configure `MARITACA_API_KEY` no arquivo `.env` e execute:
@@ -338,6 +419,36 @@ O dashboard possui uma area de consulta com fontes inspecionaveis e uma area de
 documentos para upload, listagem persistente e acompanhamento da indexacao
 assíncrona.
 
+## KPIs e observabilidade
+
+Cada consulta RAG registra no PostgreSQL:
+
+- `request_id`, pergunta, status e modelo.
+- Duracao, `top_k`, quantidade de fontes e uso reportado pela LLM.
+- Fontes recuperadas com documento, rank e score.
+- Mensagem de erro controlada quando a consulta falha.
+
+O endpoint agregado fica disponível em:
+
+```http
+GET /api/rag/kpis/overview
+```
+
+Ele retorna volume de consultas, taxa de erro, latencia media/P95, fontes por
+resposta, documentos mais recuperados, estado dos jobs, serie de sete dias e
+historico recente. A area **Indicadores** do dashboard apresenta esses dados.
+
+Logs HTTP e do fluxo RAG sao emitidos em JSON no stdout dos containers:
+
+```bash
+docker compose logs -f api
+```
+
+Os logs incluem `request_id`, status e duracao, mas nao incluem o texto da
+pergunta. O historico persistido inclui perguntas para auditoria, mas o endpoint
+de KPIs as mascara por padrao. Uma politica de retencao deve ser definida antes
+de usar dados sensiveis.
+
 ## Como avaliar o RAG
 
 O dataset inicial fica em `data/evaluation/rag_cases.json`.
@@ -352,6 +463,14 @@ Avaliar retrieval e respostas Maritaca:
 
 ```bash
 .venv/bin/python backend/manage.py evaluate_rag --with-generation
+```
+
+Depois de indexar o manual de exemplo, avaliar o domínio técnico:
+
+```bash
+.venv/bin/python backend/manage.py evaluate_rag \
+  --dataset data/evaluation/technical_manual_cases.json \
+  --output outputs/evaluation/technical-manual
 ```
 
 Os relatorios sao salvos em `outputs/evaluation/evaluation.json` e
@@ -387,12 +506,20 @@ Baseline inicial:
 - [Sprint 6 - Avaliacao minima](docs/SPRINT_6.md)
 - [Sprint 7 - Indexacao assíncrona](docs/SPRINT_7.md)
 - [Sprint 8 - Dashboard inicial](docs/SPRINT_8.md)
+- [Sprint 9 - KPIs e observabilidade](docs/SPRINT_9.md)
+- [Sprint 10 - Hardening e documentacao final](docs/SPRINT_10.md)
+- [Sprint 11 - Autenticacao e controle de acesso](docs/SPRINT_11.md)
+- [Sprint 12 - Especializacao em manuais tecnicos](docs/SPRINT_12.md)
 - [Containers e operacao local](docs/CONTAINERS.md)
+- [Manuais tecnicos](docs/TECHNICAL_MANUALS.md)
+- [Seguranca](docs/SECURITY.md)
+- [Guia de demonstracao](docs/DEMO_GUIDE.md)
 - [Plano de sprints](docs/SPRINT_PLAN.md)
 - [Decisoes arquiteturais](docs/ADR.md)
 
 ## Status
 
-Sprint 8 concluida com dashboard responsivo, chat RAG, fontes, documentos,
-indexacao assíncrona e testes E2E. A proxima etapa prevista e KPIs e
-observabilidade.
+Sprint 12 concluida com suporte especializado a manuais de impressoras e
+scanners, metadados tecnicos, filtros por modelo e prompting orientado a
+seguranca. Evolucoes recomendadas incluem OCR, extracao de tabelas/diagramas,
+busca hibrida/reranking e ingestao integralmente assincrona.

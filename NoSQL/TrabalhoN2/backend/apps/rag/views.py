@@ -1,7 +1,10 @@
+import logging
+import time
 import uuid
 from functools import lru_cache
 
 from django.conf import settings
+from django.db import transaction
 from django.http import Http404
 from django.shortcuts import get_object_or_404
 from rest_framework import status
@@ -9,10 +12,13 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from apps.common.permissions import AuthenticatedOrAPIKey, StaffOrAPIKey
 from apps.documents.models import Document
 from apps.rag.async_indexing import AsyncIndexingError, AsyncIndexingService
 from apps.rag.embeddings import FastEmbedProvider
 from apps.rag.models import IndexingJob
+from apps.rag.models import QueryStatus, RAGQueryRecord, RAGQuerySource
+from apps.rag.observability import build_kpi_summary
 from apps.rag.serializers import (
     IndexingJobSerializer,
     EmbeddingRequestSerializer,
@@ -25,6 +31,23 @@ from apps.rag.services import (
     build_rag_query_service,
     build_services,
 )
+
+logger = logging.getLogger("adaptive_rag.rag")
+TECHNICAL_FILTER_FIELDS = (
+    "manufacturer",
+    "models",
+    "equipment_type",
+    "manual_type",
+    "content_type",
+)
+
+
+def technical_filters(validated_data: dict) -> dict:
+    return {
+        key: validated_data[key]
+        for key in TECHNICAL_FILTER_FIELDS
+        if validated_data.get(key)
+    }
 
 
 @lru_cache(maxsize=1)
@@ -57,8 +80,7 @@ class InternalEmbeddingView(APIView):
 
 
 class DocumentIndexView(APIView):
-    authentication_classes = []
-    permission_classes = []
+    permission_classes = [StaffOrAPIKey]
 
     def post(self, request: Request, document_id: str) -> Response:
         document = get_object_or_404(Document, id=document_id)
@@ -66,8 +88,20 @@ class DocumentIndexView(APIView):
         try:
             chunk_count = indexing_service.index(document)
         except DocumentIndexingError as error:
+            logger.warning(
+                "document_indexing_failed",
+                extra={
+                    "event": "document_indexing_failed",
+                    "request_id": request._request.request_id,
+                    "document_id": str(document.id),
+                    "error_type": type(error).__name__,
+                },
+            )
             return Response(
-                {"detail": str(error)},
+                {
+                    "detail": "Nao foi possivel indexar o documento.",
+                    "request_id": request._request.request_id,
+                },
                 status=status.HTTP_422_UNPROCESSABLE_ENTITY,
             )
         return Response(
@@ -80,16 +114,27 @@ class DocumentIndexView(APIView):
 
 
 class AsyncDocumentIndexView(APIView):
-    authentication_classes = []
-    permission_classes = []
+    permission_classes = [StaffOrAPIKey]
 
     def post(self, request: Request, document_id: str) -> Response:
         document = get_object_or_404(Document, id=document_id)
         try:
             job = AsyncIndexingService().enqueue(document)
         except AsyncIndexingError as error:
+            logger.warning(
+                "document_indexing_enqueue_failed",
+                extra={
+                    "event": "document_indexing_enqueue_failed",
+                    "request_id": request._request.request_id,
+                    "document_id": str(document.id),
+                    "error_type": type(error).__name__,
+                },
+            )
             return Response(
-                {"detail": str(error)},
+                {
+                    "detail": "O servico de indexacao esta temporariamente indisponivel.",
+                    "request_id": request._request.request_id,
+                },
                 status=status.HTTP_503_SERVICE_UNAVAILABLE,
             )
         return Response(
@@ -99,8 +144,7 @@ class AsyncDocumentIndexView(APIView):
 
 
 class IndexingJobDetailView(APIView):
-    authentication_classes = []
-    permission_classes = []
+    permission_classes = [AuthenticatedOrAPIKey]
 
     def get(self, request: Request, job_id: str) -> Response:
         job = get_object_or_404(IndexingJob, id=job_id)
@@ -108,16 +152,19 @@ class IndexingJobDetailView(APIView):
 
 
 class SemanticSearchView(APIView):
-    authentication_classes = []
-    permission_classes = []
+    permission_classes = [AuthenticatedOrAPIKey]
 
     def post(self, request: Request) -> Response:
         serializer = SemanticSearchSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         _, search_service = build_services()
-        results = search_service.search(
-            query=serializer.validated_data["query"],
-            top_k=serializer.validated_data.get("top_k", settings.RAG_TOP_K),
+        query = serializer.validated_data["query"]
+        top_k = serializer.validated_data.get("top_k", settings.RAG_TOP_K)
+        filters = technical_filters(serializer.validated_data)
+        results = (
+            search_service.search(query=query, top_k=top_k, filters=filters)
+            if filters
+            else search_service.search(query=query, top_k=top_k)
         )
         return Response(
             {
@@ -139,21 +186,90 @@ class SemanticSearchView(APIView):
 
 
 class RAGQueryView(APIView):
-    authentication_classes = []
-    permission_classes = []
+    permission_classes = [AuthenticatedOrAPIKey]
 
     def post(self, request: Request) -> Response:
         serializer = RAGQuerySerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         request_id = str(uuid.uuid4())
+        request._request.request_id = request_id
+        question = serializer.validated_data["question"]
+        top_k = serializer.validated_data.get("top_k", settings.RAG_TOP_K)
+        started_at = time.perf_counter()
         try:
-            result = build_rag_query_service().answer(
-                question=serializer.validated_data["question"],
-                top_k=serializer.validated_data.get("top_k", settings.RAG_TOP_K),
+            filters = technical_filters(serializer.validated_data)
+            query_service = build_rag_query_service()
+            result = (
+                query_service.answer(question=question, top_k=top_k, filters=filters)
+                if filters
+                else query_service.answer(question=question, top_k=top_k)
             )
         except (RAGQueryError, ValueError) as error:
+            duration_ms = round((time.perf_counter() - started_at) * 1000)
+            RAGQueryRecord.objects.create(
+                request_id=request_id,
+                question=question,
+                status=QueryStatus.ERROR,
+                top_k=top_k,
+                duration_ms=duration_ms,
+                error_message=str(error)[:2000],
+            )
+            logger.warning(
+                "rag_query_failed",
+                extra={
+                    "event": "rag_query_failed",
+                    "request_id": request_id,
+                    "duration_ms": duration_ms,
+                    "question_length": len(question),
+                },
+            )
             return Response(
-                {"detail": str(error), "request_id": request_id},
+                {
+                    "detail": "Nao foi possivel concluir a consulta RAG.",
+                    "request_id": request_id,
+                },
                 status=status.HTTP_502_BAD_GATEWAY,
             )
+        duration_ms = round((time.perf_counter() - started_at) * 1000)
+        with transaction.atomic():
+            record = RAGQueryRecord.objects.create(
+                request_id=request_id,
+                question=question,
+                status=QueryStatus.SUCCESS,
+                model=result["model"] or "",
+                top_k=top_k,
+                source_count=len(result["sources"]),
+                duration_ms=duration_ms,
+                usage=result["usage"],
+            )
+            RAGQuerySource.objects.bulk_create(
+                [
+                    RAGQuerySource(
+                        query=record,
+                        document_id=source["document_id"],
+                        source_name=source["source_name"],
+                        rank=source["number"],
+                        score=source["score"],
+                    )
+                    for source in result["sources"]
+                ]
+            )
+        logger.info(
+            "rag_query_completed",
+            extra={
+                "event": "rag_query_completed",
+                "request_id": request_id,
+                "duration_ms": duration_ms,
+                "source_count": len(result["sources"]),
+                "model": result["model"],
+                "question_length": len(question),
+            },
+        )
         return Response({**result, "request_id": request_id})
+
+
+class KPIOverviewView(APIView):
+    permission_classes = [StaffOrAPIKey]
+
+    def get(self, request: Request) -> Response:
+        return Response(build_kpi_summary())

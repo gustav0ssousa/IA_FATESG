@@ -5,6 +5,8 @@ type RouteContext = {
 };
 
 const apiBaseUrl = process.env.API_BASE_URL ?? "http://127.0.0.1:8000";
+const apiAccessKey = process.env.API_ACCESS_KEY ?? "";
+const authenticationRequired = process.env.API_REQUIRE_AUTHENTICATION === "True";
 
 async function proxy(request: NextRequest, context: RouteContext) {
   const { path } = await context.params;
@@ -17,6 +19,7 @@ async function proxy(request: NextRequest, context: RouteContext) {
   headers.delete("connection");
   headers.delete("content-length");
   headers.delete("host");
+  if (apiAccessKey && !authenticationRequired) headers.set("x-api-key", apiAccessKey);
 
   const body = ["GET", "HEAD"].includes(request.method)
     ? undefined

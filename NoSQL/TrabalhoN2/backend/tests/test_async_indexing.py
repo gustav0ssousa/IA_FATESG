@@ -116,4 +116,7 @@ def test_async_index_endpoint_returns_503_when_broker_is_unavailable(delay_mock)
     response = APIClient().post(f"/api/rag/documents/{document.id}/index-async")
 
     assert response.status_code == status.HTTP_503_SERVICE_UNAVAILABLE
-    assert "offline" in response.json()["detail"]
+    assert response.json()["detail"] == (
+        "O servico de indexacao esta temporariamente indisponivel."
+    )
+    assert response.json()["request_id"]

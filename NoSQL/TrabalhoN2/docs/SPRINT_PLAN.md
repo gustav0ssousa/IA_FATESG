@@ -151,6 +151,9 @@ Escopo previsto:
 
 Objetivo: adicionar consultas de KPIs e sinais operacionais.
 
+Status: concluida com historico de queries e fontes, KPIs agregados, logs JSON
+correlacionados e dashboard operacional.
+
 Escopo previsto:
 
 - Historico de queries.
@@ -163,6 +166,10 @@ Escopo previsto:
 
 Objetivo: preparar o projeto para apresentacao e evolucao.
 
+Status: concluida com chave de API opcional, throttling, respostas de erro
+controladas, protecoes HTTP, mascaramento de perguntas nos KPIs, Compose
+parametrizado e documentacao final.
+
 Escopo previsto:
 
 - Revisao de seguranca.
@@ -170,3 +177,39 @@ Escopo previsto:
 - Melhorias de erro.
 - Documentacao completa.
 - Guia de demonstracao.
+
+## Sprint 11 - Autenticacao e Controle de Acesso
+
+Objetivo: adicionar identidade individual e separar operacoes de leitura e
+administracao sem quebrar o perfil local.
+
+Status: concluida com TokenAuthentication do DRF, login/logout no dashboard,
+papeis baseados em `is_staff` e compatibilidade com chave de API.
+
+Escopo:
+
+- Login, logout, perfil atual e configuracao publica de autenticacao.
+- Tokens individuais.
+- Papel leitor para consulta/listagem.
+- Papel gestor para ingestao, indexacao e KPIs.
+- Dashboard autenticado responsivo.
+- Testes e documentacao.
+
+## Sprint 12 - Especializacao em Manuais Tecnicos
+
+Objetivo: adaptar o RAG ao contexto principal de manuais de impressoras e
+scanners, preservando expansao para outros equipamentos.
+
+Status: concluida com extracao otimizada de PDFs extensos/protegidos,
+classificacao tecnica, metadados por modelo, filtros de retrieval, prompt seguro
+e dataset de avaliacao do domínio.
+
+Escopo:
+
+- Analise do manual Brother de exemplo.
+- Suporte a PDF AES e uploads de ate 75 MB.
+- Inferencia de fabricante, modelos, tipo de manual/equipamento e idioma.
+- Classificacao de seguranca, troubleshooting, erros e procedimentos.
+- Filtros de consulta por metadados tecnicos.
+- Prompt orientado a suporte tecnico e seguranca.
+- Avaliacao e documentacao do domínio.

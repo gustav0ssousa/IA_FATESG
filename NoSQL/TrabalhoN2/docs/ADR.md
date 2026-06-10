@@ -377,3 +377,150 @@ O ambiente passa a subir com um comando, possui health checks, persistencia e
 isolamento coerentes. API, worker e frontend executam sem privilegios. Para
 acessar diretamente PostgreSQL, Qdrant ou RabbitMQ a partir do host, sera
 necessario um override Compose temporario.
+
+## ADR: Observabilidade persistida no PostgreSQL e logs JSON
+
+### Status
+
+Aceito e implementado na Sprint 9.
+
+### Contexto
+
+O MVP precisava medir uso, latencia, erros e documentos recuperados sem
+introduzir uma nova plataforma operacional. Tambem era necessario correlacionar
+uma consulta com os logs HTTP sem registrar seu conteudo no stdout.
+
+### Decisao
+
+Persistir consultas em `RAGQueryRecord` e fontes em `RAGQuerySource`. Agregar
+KPIs sob demanda no endpoint `GET /api/rag/kpis/overview`. Emitir logs JSON para
+stdout com `request_id`, evento, status e duracao. O texto da pergunta nao e
+incluido nos logs, mas permanece no PostgreSQL para historico e auditoria.
+
+### Alternativas consideradas
+
+- Prometheus, Grafana e Loki: oferecem observabilidade mais completa, mas
+  aumentariam muito o escopo operacional do MVP.
+- Armazenar apenas logs: reduz modelagem, mas dificulta KPIs e consultas de
+  negocio confiaveis.
+- Salvar fontes como JSON na query: simples, mas pior para agregar documentos
+  mais recuperados.
+
+### Consequencias
+
+O dashboard obtém indicadores reproduziveis sem infraestrutura adicional e os
+eventos podem ser coletados futuramente por qualquer stack de logs. As
+agregacoes sao calculadas sob demanda e podem exigir cache com maior volume.
+Antes de dados sensiveis, sera necessario definir retencao, mascaramento e
+controle de acesso ao historico.
+
+## ADR: Hardening incremental com chave de API opcional
+
+### Status
+
+Aceito e implementado na Sprint 10.
+
+### Contexto
+
+O dashboard e as APIs do MVP precisam funcionar localmente sem provisionamento
+de usuarios, mas endpoints de ingestao, consulta e KPIs nao devem permanecer
+abertos em ambientes compartilhados. Tambem e necessario evitar vazamento de
+erros de providers e perguntas no endpoint operacional.
+
+### Decisao
+
+Adicionar uma chave compartilhada opcional via `API_ACCESS_KEY` nas APIs
+publicas. O proxy Next.js injeta a chave server-side. Aplicar throttling,
+headers HTTP seguros, IDs de requisicao validados, respostas de erro controladas
+e mascaramento de perguntas nos KPIs por padrao. Manter health check publico e
+o servico de embeddings isolado pela rede interna.
+
+### Alternativas consideradas
+
+- JWT com usuarios Django: oferece identidade e permissoes individuais, mas
+  exige fluxo de login e gestao de usuarios fora do escopo do MVP.
+- Apenas isolamento de rede: reduz configuracao, mas nao protege a API publicada.
+- Chave obrigatoria em todo ambiente: mais restritiva, mas prejudica setup local
+  e testes sem trazer identidade por usuario.
+
+### Consequencias
+
+O MVP ganha uma barreira simples para ambientes compartilhados e reduz
+exposicao de detalhes internos sem quebrar o desenvolvimento local. A chave
+compartilhada nao fornece identidade, papeis, revogacao individual ou auditoria
+por usuario. Um deploy real ainda exige TLS, segredo forte, autenticacao por
+usuario, rotacao de credenciais e politica de retencao.
+
+## ADR: Token DRF e papeis simples para acesso individual
+
+### Status
+
+Aceito e implementado na Sprint 11.
+
+### Contexto
+
+A chave compartilhada protege integracoes, mas nao identifica pessoas nem
+separa consultas de operacoes administrativas. O dashboard precisa suportar
+login sem exigir um provedor externo no MVP.
+
+### Decisao
+
+Usar `TokenAuthentication` do Django REST Framework, ativado por
+`API_REQUIRE_AUTHENTICATION`. Usuarios autenticados podem consultar e listar;
+usuarios `is_staff` podem ingerir, indexar e visualizar KPIs. Manter a chave de
+API como credencial administrativa de servico. Quando login individual esta
+ativo, o proxy Next.js nao injeta essa chave.
+
+### Alternativas consideradas
+
+- JWT: adequado a sistemas distribuidos, mas adiciona refresh, expiracao e
+  rotacao antes de serem necessarios.
+- Sessao Django com CSRF: madura, mas exige compartilhar cookies e CSRF entre
+  o proxy Next.js e Django.
+- Provedor OIDC externo: melhor para producao corporativa, mas amplia
+  infraestrutura e configuracao do MVP.
+
+### Consequencias
+
+O sistema passa a identificar usuarios e revogar tokens individualmente, com
+uma matriz de acesso simples. Tokens DRF nao expiram automaticamente e o
+dashboard os mantem em `localStorage`; producao deve considerar OIDC ou tokens
+curtos em cookies seguros. Ainda nao existe auditoria de consultas por usuario.
+
+## ADR: Metadados e filtros de domínio para manuais técnicos
+
+### Status
+
+Aceito e implementado na Sprint 12.
+
+### Contexto
+
+Manuais de impressoras e scanners podem cobrir dezenas de modelos, codigos de
+erro, procedimentos perigosos, tabelas e centenas de paginas. Retrieval apenas
+semantico pode misturar modelos ou omitir alertas relevantes. O manual de
+exemplo possui 513 paginas, 50 MB, criptografia AES permitida para copia e 25
+modelos Brother.
+
+### Decisao
+
+Usar PyMuPDF como extrator PDF primario e `pypdf` como fallback. Inferir e
+preservar metadados tecnicos no documento e nos chunks. Classificar chunks como
+seguranca, troubleshooting, erro, procedimento, especificacao, manutencao ou
+referencia. Permitir filtros Qdrant por fabricante, modelo, equipamento, manual
+e conteúdo. Orientar o prompt a preservar codigos/modelos e priorizar seguranca.
+
+### Alternativas consideradas
+
+- Tratar manuais como PDFs genericos: simples, mas aumenta risco de contexto
+  incorreto e perde estrutura tecnica.
+- Um parser especifico para Brother: mais preciso no exemplo, mas impediria a
+  expansao para outras marcas.
+- OCR e extracao multimodal completa: maior cobertura de diagramas, mas exige
+  modelos, custo e pipeline adicionais.
+
+### Consequências
+
+Consultas podem ser restringidas ao equipamento correto e respostas recebem
+contexto técnico mais rico. Heuristicas continuam aproximadas e devem evoluir
+com novos fabricantes. Diagramas, tabelas complexas e PDFs apenas em imagem
+ainda precisam de pipeline multimodal/OCR.
