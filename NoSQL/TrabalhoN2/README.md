@@ -225,6 +225,7 @@ docker compose exec api python manage.py check
 | `API_ANON_THROTTLE_RATE` | Limite de requisicoes anonimas do DRF |
 | `API_USER_THROTTLE_RATE` | Limite de requisicoes autenticadas do DRF |
 | `DATABASE_URL` | Conexao principal com PostgreSQL |
+| `POSTGRES_HOST_PORT` | Porta do PostgreSQL publicada no host; dentro do Compose permanece `5432` |
 | `DOCUMENT_MAX_UPLOAD_SIZE` | Tamanho maximo do upload em bytes; padrao 75 MB |
 | `RAG_CHUNK_SIZE` | Tamanho alvo de cada chunk em caracteres |
 | `RAG_CHUNK_OVERLAP` | Sobreposicao entre chunks em caracteres |

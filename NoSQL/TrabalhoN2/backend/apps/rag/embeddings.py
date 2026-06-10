@@ -44,6 +44,9 @@ class FastEmbedProvider:
         return next(self._model.query_embed(text)).tolist()
 
 
+_REMOTE_BATCH_SIZE = 100
+
+
 class RemoteEmbeddingProvider:
     def __init__(self, url: str, dimension: int, timeout_seconds: float) -> None:
         self._url = url
@@ -55,7 +58,14 @@ class RemoteEmbeddingProvider:
         return self._dimension
 
     def embed_documents(self, texts: Sequence[str]) -> list[list[float]]:
-        return self._request("documents", list(texts))
+        all_texts = list(texts)
+        if len(all_texts) <= _REMOTE_BATCH_SIZE:
+            return self._request("documents", all_texts)
+        results: list[list[float]] = []
+        for i in range(0, len(all_texts), _REMOTE_BATCH_SIZE):
+            batch = all_texts[i : i + _REMOTE_BATCH_SIZE]
+            results.extend(self._request("documents", batch))
+        return results
 
     def embed_query(self, text: str) -> list[float]:
         return self._request("query", [text])[0]

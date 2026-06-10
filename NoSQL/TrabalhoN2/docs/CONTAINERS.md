@@ -12,7 +12,7 @@ publicados no host; bancos e broker permanecem isolados na rede interna.
 | `worker` | `adaptive-rag-backend:local` | nenhuma | Indexacao assíncrona Celery |
 | `embeddings` | `adaptive-rag-backend:local` | nenhuma | Modelo ONNX compartilhado internamente |
 | `embedding-cache-init` | `alpine:3.22` | nenhuma | Prepara permissoes do volume de embeddings |
-| `postgres` | `postgres:17-alpine` | nenhuma | Dados estruturados e jobs |
+| `postgres` | `postgres:17-alpine` | `POSTGRES_HOST_PORT` (`5432` por padrao) | Dados estruturados e jobs |
 | `qdrant` | `qdrant/qdrant:v1.18.0` | nenhuma | Embeddings e busca vetorial |
 | `rabbitmq` | `rabbitmq:4.2-management-alpine` | nenhuma | Broker de tarefas |
 
@@ -21,11 +21,12 @@ redundantes. Os containers da aplicacao executam com usuarios sem privilegios.
 
 ## Redes
 
-- `app`: conecta frontend, API e worker. API e worker usam essa rede para
-  chamadas externas, como Maritaca.
+- `app`: conecta frontend, API e worker. Servicos publicados no host tambem
+  usam essa rede nao interna. API e worker a usam para chamadas externas, como
+  Maritaca.
 - `backend`: rede interna que conecta API e worker ao servico de embeddings,
-  PostgreSQL, Qdrant e RabbitMQ. Esses servicos nao sao acessiveis diretamente
-  pelo host.
+  PostgreSQL, Qdrant e RabbitMQ. Apenas servicos com uma porta explicitamente
+  publicada e ligados tambem a rede `app` sao acessiveis pelo host.
 
 ## Volumes
 
@@ -74,6 +75,18 @@ preserva o token do usuario e nao injeta a chave administrativa.
 Credenciais locais de PostgreSQL e RabbitMQ sao configuradas por variaveis no
 `.env`. Os valores padrao do Compose servem apenas para desenvolvimento e devem
 ser trocados em qualquer ambiente compartilhado.
+
+A porta publicada do PostgreSQL pode ser alterada no `.env`, por exemplo:
+
+```dotenv
+POSTGRES_HOST_PORT=5434
+DATABASE_URL=postgresql://rag_user:rag_password@localhost:5434/rag_db
+```
+
+Conexoes feitas pelo host usam `localhost:5434`. API e worker executados no
+Compose continuam usando `postgres:5432`, pois a comunicacao entre containers
+usa a porta interna do servico. A publicacao fica limitada a `127.0.0.1` para
+nao expor o banco em outras interfaces da maquina.
 
 ## Operacao
 

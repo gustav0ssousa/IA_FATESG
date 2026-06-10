@@ -20,6 +20,8 @@ x-backend-common: &backend-common
 services:
   postgres:
     image: postgres:17-alpine
+    ports:
+      - "127.0.0.1:${POSTGRES_HOST_PORT:-5432}:5432"
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-rag_db}
       POSTGRES_USER: ${POSTGRES_USER:-rag_user}
@@ -34,9 +36,13 @@ services:
     restart: unless-stopped
     networks:
       - backend
+      - app
 
   qdrant:
     image: qdrant/qdrant:v1.18.0
+    ports:
+      - "6333:6333"
+      - "6334:6334"
     volumes:
       - qdrant_data:/qdrant/storage
     healthcheck:
@@ -47,6 +53,7 @@ services:
     restart: unless-stopped
     networks:
       - backend
+      - app
 
   rabbitmq:
     image: rabbitmq:4.2-management-alpine
