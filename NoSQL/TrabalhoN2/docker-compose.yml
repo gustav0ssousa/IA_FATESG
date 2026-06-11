@@ -11,6 +11,7 @@ x-backend-common: &backend-common
     EMBEDDING_CACHE_DIR: /home/app/.cache/fastembed
     EMBEDDING_SERVICE_URL: http://embeddings:8000/api/rag/internal/embeddings
     EMBEDDING_SERVICE_ENABLED: "False"
+    DOCUMENT_STORAGE_DIR: /app/media
   restart: unless-stopped
   init: true
   networks:
@@ -147,6 +148,8 @@ services:
       timeout: 5s
       retries: 12
       start_period: 20s
+    volumes:
+      - document_uploads:/app/media
 
   worker:
     <<: *backend-common
@@ -172,6 +175,8 @@ services:
       timeout: 10s
       retries: 6
       start_period: 30s
+    volumes:
+      - document_uploads:/app/media
 
   frontend:
     image: adaptive-rag-frontend:local
@@ -210,6 +215,7 @@ volumes:
   qdrant_data:
   rabbitmq_data:
   embedding_cache:
+  document_uploads:
 
 networks:
   app:

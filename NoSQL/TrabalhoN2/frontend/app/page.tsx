@@ -8,6 +8,7 @@ import {
   BookOpenText,
   Bot,
   Check,
+  ChevronLeft,
   ChevronRight,
   Clock3,
   Filter,
@@ -18,8 +19,10 @@ import {
   MessageSquareText,
   PanelRightClose,
   PanelRightOpen,
+  Pencil,
   Plus,
   RefreshCw,
+  RotateCw,
   Search,
   ShieldCheck,
   Tags,
@@ -28,7 +31,7 @@ import {
   Wrench,
   X,
 } from "lucide-react";
-import { FormEvent, useEffect, useRef, useState } from "react";
+import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
 
 type Source = {
   number: number;
@@ -81,6 +84,34 @@ type IngestedDocument = {
     equipment_type?: string;
     manual_type?: string;
   };
+};
+
+type DocumentOperation = {
+  document: IngestedDocument;
+  job: Job | null;
+  duplicate?: boolean;
+};
+
+type DocumentListResponse = {
+  results: IngestedDocument[];
+  pagination: {
+    page: number;
+    page_size: number;
+    total: number;
+    total_pages: number;
+  };
+  facets: {
+    manufacturers: string[];
+    models: string[];
+  };
+};
+
+type MetadataDraft = {
+  title: string;
+  manufacturer: string;
+  models: string;
+  equipment_type: string;
+  manual_type: string;
 };
 
 type KPIOverview = {
@@ -152,7 +183,7 @@ const manualTypeLabels: Record<string, string> = {
 
 const jobLabels: Record<Job["status"], string> = {
   queued: "Na fila",
-  processing: "Indexando",
+  processing: "Processando",
   retrying: "Nova tentativa",
   completed: "Concluído",
   failed: "Falhou",
@@ -202,6 +233,9 @@ export default function Dashboard() {
   const [sourcesOpen, setSourcesOpen] = useState(false);
   const [jobs, setJobs] = useState<Job[]>([]);
   const [documents, setDocuments] = useState<IngestedDocument[]>([]);
+  const [documentPage, setDocumentPage] = useState(1);
+  const [documentPagination, setDocumentPagination] = useState({ page: 1, page_size: 25, total: 0, total_pages: 1 });
+  const [documentFacets, setDocumentFacets] = useState({ manufacturers: [] as string[], models: [] as string[] });
   const [isUploading, setIsUploading] = useState(false);
   const [uploadError, setUploadError] = useState("");
   const [isLoadingDocuments, setIsLoadingDocuments] = useState(false);
@@ -218,14 +252,13 @@ export default function Dashboard() {
   const [manufacturerFilter, setManufacturerFilter] = useState("");
   const [modelFilter, setModelFilter] = useState("");
   const [contentTypeFilter, setContentTypeFilter] = useState("");
+  const [editingDocument, setEditingDocument] = useState<IngestedDocument | null>(null);
+  const [metadataDraft, setMetadataDraft] = useState<MetadataDraft | null>(null);
+  const [isSavingMetadata, setIsSavingMetadata] = useState(false);
   const fileInput = useRef<HTMLInputElement>(null);
   const canManage = !authRequired || user?.is_staff;
-  const manufacturers = [...new Set(documents.map((document) => document.metadata?.manufacturer).filter(Boolean))] as string[];
-  const models = [...new Set(
-    documents
-      .filter((document) => !manufacturerFilter || document.metadata?.manufacturer === manufacturerFilter)
-      .flatMap((document) => document.metadata?.models ?? []),
-  )].sort();
+  const manufacturers = documentFacets.manufacturers;
+  const models = documentFacets.models;
   const activeFilterCount = [manufacturerFilter, modelFilter, contentTypeFilter].filter(Boolean).length;
 
   useEffect(() => {
@@ -255,6 +288,24 @@ export default function Dashboard() {
     void initializeAuth();
   }, []);
 
+  const loadDocuments = useCallback(async () => {
+    setIsLoadingDocuments(true);
+    try {
+      const response = await apiFetch(`/backend-api/documents?page=${documentPage}&page_size=25`);
+      if (!response.ok) throw new Error(await readError(response));
+      const body = (await response.json()) as DocumentListResponse;
+      setDocuments(body.results);
+      setDocumentPagination(body.pagination);
+      setDocumentFacets(body.facets);
+    } catch (error) {
+      setUploadError(
+        error instanceof Error ? error.message : "Falha ao carregar documentos.",
+      );
+    } finally {
+      setIsLoadingDocuments(false);
+    }
+  }, [documentPage]);
+
   useEffect(() => {
     const activeJobs = jobs.filter((job) =>
       ["queued", "processing", "retrying"].includes(job.status),
@@ -273,28 +324,16 @@ export default function Dashboard() {
           (job) => refreshed.find((candidate) => candidate.id === job.id) ?? job,
         ),
       );
+      if (refreshed.some((job) => ["completed", "failed"].includes(job.status))) {
+        void loadDocuments();
+      }
     }, 2500);
     return () => window.clearInterval(timer);
-  }, [jobs]);
-
-  async function loadDocuments() {
-    setIsLoadingDocuments(true);
-    try {
-      const response = await apiFetch("/backend-api/documents");
-      if (!response.ok) throw new Error(await readError(response));
-      setDocuments((await response.json()) as IngestedDocument[]);
-    } catch (error) {
-      setUploadError(
-        error instanceof Error ? error.message : "Falha ao carregar documentos.",
-      );
-    } finally {
-      setIsLoadingDocuments(false);
-    }
-  }
+  }, [jobs, loadDocuments]);
 
   useEffect(() => {
     if (authReady && (!authRequired || user)) void loadDocuments();
-  }, [authReady, authRequired, user]);
+  }, [authReady, authRequired, user, loadDocuments]);
 
   async function loadKpis() {
     setIsLoadingKpis(true);
@@ -376,19 +415,13 @@ export default function Dashboard() {
         body: form,
       });
       if (!ingestResponse.ok) throw new Error(await readError(ingestResponse));
-      const document = (await ingestResponse.json()) as IngestedDocument;
+      const operation = (await ingestResponse.json()) as DocumentOperation;
+      const document = operation.document;
       setDocuments((current) => [
         document,
         ...current.filter((item) => item.id !== document.id),
       ]);
-
-      const indexResponse = await apiFetch(
-        `/backend-api/rag/documents/${document.id}/index-async`,
-        { method: "POST" },
-      );
-      if (!indexResponse.ok) throw new Error(await readError(indexResponse));
-      const job = (await indexResponse.json()) as Job;
-      setJobs((current) => [job, ...current]);
+      if (operation.job) setJobs((current) => [operation.job!, ...current]);
     } catch (error) {
       setUploadError(
         error instanceof Error ? error.message : "Falha ao enviar documento.",
@@ -396,6 +429,57 @@ export default function Dashboard() {
     } finally {
       setIsUploading(false);
       if (fileInput.current) fileInput.current.value = "";
+    }
+  }
+
+  function openMetadataEditor(document: IngestedDocument) {
+    setEditingDocument(document);
+    setMetadataDraft({
+      title: document.title,
+      manufacturer: document.metadata?.manufacturer ?? "",
+      models: document.metadata?.models?.join(", ") ?? "",
+      equipment_type: document.metadata?.equipment_type ?? "other",
+      manual_type: document.metadata?.manual_type ?? "technical_document",
+    });
+  }
+
+  async function saveMetadata(event: FormEvent) {
+    event.preventDefault();
+    if (!editingDocument || !metadataDraft) return;
+    setIsSavingMetadata(true);
+    setUploadError("");
+    try {
+      const response = await apiFetch(`/backend-api/documents/${editingDocument.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...metadataDraft,
+          models: metadataDraft.models.split(",").map((model) => model.trim()).filter(Boolean),
+        }),
+      });
+      if (!response.ok) throw new Error(await readError(response));
+      const operation = (await response.json()) as DocumentOperation;
+      setDocuments((current) => current.map((item) => item.id === operation.document.id ? operation.document : item));
+      if (operation.job) setJobs((current) => [operation.job!, ...current]);
+      setEditingDocument(null);
+      setMetadataDraft(null);
+    } catch (error) {
+      setUploadError(error instanceof Error ? error.message : "Falha ao atualizar metadados.");
+    } finally {
+      setIsSavingMetadata(false);
+    }
+  }
+
+  async function reprocessDocument(document: IngestedDocument) {
+    setUploadError("");
+    try {
+      const response = await apiFetch(`/backend-api/documents/${document.id}/reprocess`, { method: "POST" });
+      if (!response.ok) throw new Error(await readError(response));
+      const job = (await response.json()) as Job;
+      setJobs((current) => [job, ...current]);
+      setDocuments((current) => current.map((item) => item.id === document.id ? { ...item, status: "pending" } : item));
+    } catch (error) {
+      setUploadError(error instanceof Error ? error.message : "Falha ao reprocessar manual.");
     }
   }
 
@@ -612,13 +696,13 @@ export default function Dashboard() {
             </section>}
             {uploadError && <div className="error-banner"><X size={17} />{uploadError}</div>}
 
-            <div className="section-title"><div><h2>Manuais disponíveis</h2><p>{documents.length} arquivo(s) cobrindo {models.length} modelo(s)</p></div><button className="icon-button" title="Atualizar" onClick={() => void loadDocuments()} disabled={isLoadingDocuments}><RefreshCw className={isLoadingDocuments ? "spin" : ""} size={17} /></button></div>
+            <div className="section-title"><div><h2>Manuais disponíveis</h2><p>{documentPagination.total} arquivo(s) cobrindo {models.length} modelo(s)</p></div><button className="icon-button" title="Atualizar" onClick={() => void loadDocuments()} disabled={isLoadingDocuments}><RefreshCw className={isLoadingDocuments ? "spin" : ""} size={17} /></button></div>
 
             {!documents.length ? (
               <div className="document-empty"><FileText size={26} /><strong>Nenhum manual disponível</strong><span>Adicione um manual técnico para iniciar a biblioteca.</span></div>
             ) : (
               <div className="document-table">
-                <div className="table-head"><span>Manual</span><span>Cobertura</span><span>Conteúdo</span><span>Indexação</span></div>
+                <div className="table-head"><span>Manual</span><span>Cobertura</span><span>Conteúdo</span><span>Indexação</span><span>Ações</span></div>
                 {documents.map((document) => {
                   const job = jobs.find((item) => item.document_id === document.id);
                   const displayStatus = job?.status ?? document.status;
@@ -633,12 +717,36 @@ export default function Dashboard() {
                         {displayStatus === "completed" || displayStatus === "indexed" ? <Check size={14} /> : displayStatus === "failed" ? <X size={14} /> : displayStatus === "processing" ? <LoaderCircle className="spin" size={14} /> : <Clock3 size={14} />}
                         {job ? jobLabels[job.status] : documentStatusLabels[document.status] ?? document.status}
                       </span>
+                      <div className="document-actions">
+                        {canManage && <button className="icon-button" title="Revisar metadados" onClick={() => openMetadataEditor(document)}><Pencil size={14} /></button>}
+                        {canManage && <button className="icon-button" title="Reprocessar manual" onClick={() => void reprocessDocument(document)} disabled={job ? ["queued", "processing", "retrying"].includes(job.status) : false}><RotateCw size={14} /></button>}
+                      </div>
                     </article>
                   );
                 })}
               </div>
             )}
+            {documentPagination.total_pages > 1 && <nav className="document-pagination" aria-label="Paginação de manuais">
+              <button className="icon-button" title="Página anterior" disabled={documentPage <= 1} onClick={() => setDocumentPage((page) => page - 1)}><ChevronLeft size={15} /></button>
+              <span>Página {documentPagination.page} de {documentPagination.total_pages}</span>
+              <button className="icon-button" title="Próxima página" disabled={documentPage >= documentPagination.total_pages} onClick={() => setDocumentPage((page) => page + 1)}><ChevronRight size={15} /></button>
+            </nav>}
           </div>
+          {editingDocument && metadataDraft && (
+            <div className="modal-backdrop" role="presentation" onMouseDown={() => setEditingDocument(null)}>
+              <form className="metadata-dialog" onSubmit={saveMetadata} onMouseDown={(event) => event.stopPropagation()}>
+                <div className="dialog-heading"><div><h2>Revisar metadados</h2><p>{editingDocument.source_name}</p></div><button className="icon-button" type="button" title="Fechar" onClick={() => setEditingDocument(null)}><X size={16} /></button></div>
+                <label>Título<input value={metadataDraft.title} onChange={(event) => setMetadataDraft({ ...metadataDraft, title: event.target.value })} /></label>
+                <label>Fabricante<input value={metadataDraft.manufacturer} onChange={(event) => setMetadataDraft({ ...metadataDraft, manufacturer: event.target.value })} /></label>
+                <label>Modelos<input value={metadataDraft.models} onChange={(event) => setMetadataDraft({ ...metadataDraft, models: event.target.value })} placeholder="MFC-L5710DN, MFC-L5715DW" /></label>
+                <div className="dialog-grid">
+                  <label>Equipamento<select value={metadataDraft.equipment_type} onChange={(event) => setMetadataDraft({ ...metadataDraft, equipment_type: event.target.value })}><option value="printer">Impressora</option><option value="scanner">Scanner</option><option value="multifunction">Multifuncional</option><option value="other">Outro</option></select></label>
+                  <label>Tipo de manual<select value={metadataDraft.manual_type} onChange={(event) => setMetadataDraft({ ...metadataDraft, manual_type: event.target.value })}>{Object.entries(manualTypeLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
+                </div>
+                <button className="primary-action" type="submit" disabled={isSavingMetadata}>{isSavingMetadata ? <LoaderCircle className="spin" size={16} /> : <Check size={16} />}Salvar e reindexar</button>
+              </form>
+            </div>
+          )}
         </section>
       ) : (
         <section className="workspace">

@@ -69,12 +69,24 @@ Busca e consulta aceitam filtros opcionais:
 O filtro por modelo reduz mistura entre famílias. Quando a pergunta não informa
 o modelo, a resposta deve explicitar a aplicabilidade encontrada nas fontes.
 
+## Gate de confiabilidade
+
+Resultados com score inferior a `RAG_MIN_RELEVANCE_SCORE` sao removidos antes
+da montagem do prompt. O valor inicial e `0.35` e deve ser calibrado com o
+dataset técnico sempre que o modelo de embeddings ou o acervo mudar.
+
+Quando a pergunta cita explicitamente um fabricante conhecido ou um modelo
+identificavel, a geração somente acontece se ao menos uma fonte recuperada for
+compativel. Caso contrario, o sistema retorna uma recusa sem chamar a LLM.
+
 ## Limitações
 
 - Heuristicas podem exigir ajuste para novas marcas e formatos.
 - Tabelas complexas podem perder relações entre colunas durante a extração.
 - Diagramas, imagens e PDFs escaneados não são interpretados.
-- A ingestão extrai/chunka no request HTTP; mover essa etapa para worker e
-  recomendado para lotes ou manuais ainda maiores.
+- O request HTTP persiste o upload e publica o job; extracao, chunking e
+  indexacao executam no worker.
+- O worker ainda carrega o conteudo exigido pelos extratores atuais; arquivos
+  muito maiores podem exigir extracao incremental ou object storage.
 - Procedimentos de serviço podem exigir técnico qualificado e equipamentos de
   proteção; o RAG não substitui treinamento ou normas do fabricante.

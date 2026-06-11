@@ -1,5 +1,5 @@
 import pytest
-from qdrant_client import QdrantClient
+from qdrant_client import QdrantClient, models
 
 from apps.documents.models import Document, DocumentChunk, DocumentStatus
 from apps.rag.services import (
@@ -7,7 +7,7 @@ from apps.rag.services import (
     DocumentIndexingService,
     SemanticSearchService,
 )
-from apps.rag.vector_store import QdrantVectorStore
+from apps.rag.vector_store import QdrantVectorStore, SearchResult
 
 
 pytestmark = pytest.mark.django_db
@@ -106,6 +106,39 @@ def test_semantic_search_returns_most_relevant_chunk() -> None:
     assert results[0].source_name == "arquitetura.md"
 
 
+def test_semantic_search_discards_results_below_minimum_score() -> None:
+    class StaticVectorStore:
+        def search(self, vector, top_k):
+            return [
+                SearchResult(
+                    chunk_id="low-score",
+                    document_id="document",
+                    score=0.34,
+                    content="Contexto pouco relevante.",
+                    source_name="manual.pdf",
+                    page_number=1,
+                    metadata={},
+                ),
+                SearchResult(
+                    chunk_id="accepted",
+                    document_id="document",
+                    score=0.35,
+                    content="Contexto aceito.",
+                    source_name="manual.pdf",
+                    page_number=2,
+                    metadata={},
+                ),
+            ]
+
+    results = SemanticSearchService(
+        FakeEmbeddingProvider(),
+        StaticVectorStore(),
+        min_relevance_score=0.35,
+    ).search("consulta", 5)
+
+    assert [result.chunk_id for result in results] == ["accepted"]
+
+
 def test_semantic_search_filters_technical_metadata() -> None:
     document = make_document_with_chunks()
     document.chunks.filter(position=0).update(
@@ -152,3 +185,50 @@ def test_indexing_failure_is_recorded_on_document() -> None:
     document.refresh_from_db()
     assert document.status == DocumentStatus.FAILED
     assert "modelo indisponivel" in document.error_message
+
+
+def test_qdrant_reconciliation_is_safe_and_idempotent() -> None:
+    document = make_document_with_chunks()
+    embeddings = FakeEmbeddingProvider()
+    client = QdrantClient(":memory:")
+    vector_store = QdrantVectorStore(
+        client=client,
+        collection_name="reconciliation",
+        vector_size=3,
+    )
+    DocumentIndexingService(embeddings, vector_store).index(document)
+    expected_chunk = document.chunks.order_by("position").first()
+    missing_chunk_id = "b1633bb1-8af5-4d51-90f5-536f62b14b44"
+    client.upsert(
+        "reconciliation",
+        points=[
+            models.PointStruct(
+                id="0dad0192-d49b-4f41-b14a-dfa5e86c1289",
+                vector=[1.0, 0.0, 0.0],
+                payload={"chunk_id": "stale"},
+            )
+        ],
+    )
+
+    dry_run = vector_store.reconcile(
+        {str(expected_chunk.id), missing_chunk_id},
+    )
+
+    assert len(dry_run.orphan_point_ids) == 2
+    assert dry_run.missing_chunk_ids == (missing_chunk_id,)
+    assert dry_run.deleted_points == 0
+    assert client.count("reconciliation", exact=True).count == 3
+
+    applied = vector_store.reconcile(
+        {str(expected_chunk.id), missing_chunk_id},
+        apply=True,
+    )
+    second_run = vector_store.reconcile(
+        {str(expected_chunk.id), missing_chunk_id},
+        apply=True,
+    )
+
+    assert applied.deleted_points == 2
+    assert second_run.orphan_point_ids == ()
+    assert second_run.deleted_points == 0
+    assert second_run.missing_chunk_ids == (missing_chunk_id,)

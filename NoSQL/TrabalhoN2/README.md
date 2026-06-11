@@ -240,6 +240,7 @@ docker compose exec api python manage.py check
 | `QDRANT_URL` | URL HTTP do Qdrant |
 | `QDRANT_COLLECTION` | Colecao vetorial dos chunks |
 | `RAG_TOP_K` | Quantidade padrao de resultados semanticos |
+| `RAG_MIN_RELEVANCE_SCORE` | Score cosseno minimo aceito no retrieval; padrao `0.35` |
 | `RAG_MAX_CONTEXT_CHARS` | Limite de caracteres enviados como contexto |
 | `MARITACA_API_KEY` | Chave da API Maritaca |
 | `MARITACA_BASE_URL` | URL base compativel com SDK OpenAI |
@@ -250,6 +251,8 @@ docker compose exec api python manage.py check
 | `MARITACA_MAX_RETRIES` | Retentativas automaticas da chamada |
 | `CELERY_BROKER_URL` | Conexao AMQP usada pelo Celery |
 | `CELERY_INDEXING_MAX_RETRIES` | Retentativas de um job de indexacao |
+| `AUDIT_STORE_QUESTION_TEXT` | Persiste texto integral da pergunta; desativado por padrao |
+| `AUDIT_RETENTION_DAYS` | Retencao padrao da auditoria; padrao `90` dias |
 | `OBSERVABILITY_EXPOSE_QUESTION_TEXT` | Exibe perguntas no endpoint de KPIs quando `True` |
 
 Quando `API_ACCESS_KEY` estiver preenchida, chamadas diretas a API devem incluir:
@@ -289,7 +292,7 @@ Endpoints: `GET /api/auth/config`, `POST /api/auth/login`,
 
 O PostgreSQL armazena:
 
-- `Document`: origem, hash unico, status, metadados e auditoria.
+- `Document`: origem, arquivo original, hash unico, status, metadados e auditoria.
 - `DocumentChunk`: conteudo dos chunks, ordem, hash, pagina e metadados.
 - `IndexingJob`: estado, tentativas, erros e tempos da indexacao assíncrona.
 
@@ -316,14 +319,15 @@ curl -X POST http://127.0.0.1:8000/api/documents/ingest \
   -F "title=Visao geral do RAG"
 ```
 
-O pipeline atual:
+O endpoint persiste o arquivo e retorna `202 Accepted` com documento e job. O
+pipeline executado pelo worker:
 
 1. Valida formato e tamanho do arquivo.
-2. Calcula hash para detectar duplicatas.
-3. Extrai texto, preservando pagina quando disponivel.
-4. Normaliza espacos e quebras de linha.
-5. Divide o texto com `langchain-text-splitters`.
-6. Persiste documento e chunks.
+2. Calcula hash em streaming para detectar duplicatas.
+3. Persiste o arquivo original no volume compartilhado.
+4. Extrai texto, preservando pagina quando disponivel.
+5. Normaliza e divide o texto com `langchain-text-splitters`.
+6. Persiste chunks, gera embeddings e atualiza o Qdrant.
 
 PDFs baseados apenas em imagem ainda exigem OCR e retornam erro controlado.
 PDFs protegidos que permitem extracao sao suportados por PyMuPDF, com fallback
@@ -350,15 +354,7 @@ Detalhes do domínio e da análise do manual estão em
 
 ## Como indexar no Qdrant
 
-Depois da ingestao, o documento possui status `chunked`. Para gerar embeddings e
-persistir os vetores sem bloquear a requisicao:
-
-```bash
-docker compose up -d qdrant rabbitmq
-curl -X POST http://127.0.0.1:8000/api/rag/documents/UUID_DO_DOCUMENTO/index-async
-```
-
-O endpoint retorna `202 Accepted` e um `id` de job. Consulte seu estado:
+O upload ja enfileira extracao, chunking e indexacao. Consulte o job retornado:
 
 ```bash
 curl http://127.0.0.1:8000/api/rag/jobs/UUID_DO_JOB
@@ -367,6 +363,14 @@ curl http://127.0.0.1:8000/api/rag/jobs/UUID_DO_JOB
 Estados possiveis: `queued`, `processing`, `retrying`, `completed` e `failed`.
 Falhas temporarias sao retentadas com backoff exponencial. O endpoint sincrono
 `POST /api/rag/documents/UUID_DO_DOCUMENTO/index` permanece disponivel.
+
+Metadados podem ser corrigidos e reindexados com
+`PATCH /api/documents/UUID_DO_DOCUMENTO`. Para executar novamente todo o
+pipeline a partir do arquivo original:
+
+```bash
+curl -X POST http://127.0.0.1:8000/api/documents/UUID_DO_DOCUMENTO/reprocess
+```
 
 O modelo padrao e
 `sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2`, executado
@@ -424,9 +428,10 @@ assíncrona.
 
 Cada consulta RAG registra no PostgreSQL:
 
-- `request_id`, pergunta, status e modelo.
+- `request_id`, identidade/metodo de autenticacao, hash da pergunta, status e modelo.
+- Filtros tecnicos aplicados; texto integral da pergunta somente quando habilitado.
 - Duracao, `top_k`, quantidade de fontes e uso reportado pela LLM.
-- Fontes recuperadas com documento, rank e score.
+- Fontes recuperadas com documento, chunk, pagina, metadados, rank e score.
 - Mensagem de erro controlada quando a consulta falha.
 
 O endpoint agregado fica disponível em:
@@ -446,9 +451,13 @@ docker compose logs -f api
 ```
 
 Os logs incluem `request_id`, status e duracao, mas nao incluem o texto da
-pergunta. O historico persistido inclui perguntas para auditoria, mas o endpoint
-de KPIs as mascara por padrao. Uma politica de retencao deve ser definida antes
-de usar dados sensiveis.
+pergunta. Por padrao, a auditoria persiste apenas o hash da pergunta e os KPIs
+mascaram seu texto. A retencao pode ser revisada e aplicada explicitamente:
+
+```bash
+docker compose exec api python manage.py purge_rag_audit
+docker compose exec api python manage.py purge_rag_audit --apply
+```
 
 ## Como avaliar o RAG
 
@@ -474,6 +483,19 @@ Depois de indexar o manual de exemplo, avaliar o domínio técnico:
   --output outputs/evaluation/technical-manual
 ```
 
+Antes de avaliar uma base persistente, verificar e reconciliar PostgreSQL e
+Qdrant. O primeiro comando e sempre um dry-run:
+
+```bash
+.venv/bin/python backend/manage.py reconcile_qdrant
+.venv/bin/python backend/manage.py reconcile_qdrant --apply
+.venv/bin/python backend/manage.py reconcile_qdrant --apply --reindex-missing
+```
+
+Somente chunks de documentos com status `indexed` sao considerados esperados.
+`--apply` remove pontos orfaos e `--reindex-missing` reindexa documentos que
+possuem chunks ausentes.
+
 Os relatorios sao salvos em `outputs/evaluation/evaluation.json` e
 `outputs/evaluation/evaluation.md`. O quality gate inicial exige:
 
@@ -481,6 +503,7 @@ Os relatorios sao salvos em `outputs/evaluation/evaluation.json` e
 - Mean Reciprocal Rank >= `0.70`.
 - Citation Rate >= `0.80`, quando a geracao for avaliada.
 - Answer Term Recall >= `0.60`, quando a geracao for avaliada.
+- Refusal Accuracy igual a `1.00`, quando a geracao for avaliada.
 - Generation Errors deve ser igual a `0`.
 - Duplicate Result Rate deve ser igual a `0`.
 
@@ -498,6 +521,7 @@ Baseline inicial:
 
 ## Documentacao
 
+- [Revisao final e roadmap de entrega](docs/FINAL_REVIEW_AND_ROADMAP.md)
 - [Sprint 0 - Analise e planejamento](docs/SPRINT_0.md)
 - [Sprint 1 - Fundacao backend](docs/SPRINT_1.md)
 - [Sprint 2 - Persistencia estruturada](docs/SPRINT_2.md)
@@ -511,6 +535,9 @@ Baseline inicial:
 - [Sprint 10 - Hardening e documentacao final](docs/SPRINT_10.md)
 - [Sprint 11 - Autenticacao e controle de acesso](docs/SPRINT_11.md)
 - [Sprint 12 - Especializacao em manuais tecnicos](docs/SPRINT_12.md)
+- [Sprint 13 - Gate de confiabilidade](docs/SPRINT_13.md)
+- [Sprint 14 - Ingestao assincrona e ciclo de vida](docs/SPRINT_14.md)
+- [Sprint 15 - Auditoria, deploy e fechamento](docs/SPRINT_15.md)
 - [Containers e operacao local](docs/CONTAINERS.md)
 - [Manuais tecnicos](docs/TECHNICAL_MANUALS.md)
 - [Seguranca](docs/SECURITY.md)
@@ -520,7 +547,8 @@ Baseline inicial:
 
 ## Status
 
-Sprint 12 concluida com suporte especializado a manuais de impressoras e
-scanners, metadados tecnicos, filtros por modelo e prompting orientado a
-seguranca. Evolucoes recomendadas incluem OCR, extracao de tabelas/diagramas,
-busca hibrida/reranking e ingestao integralmente assincrona.
+Sprint 15 adicionou auditoria detalhada e redigida por padrao, politica
+executavel de retencao, biblioteca paginada com facets globais e perfil Compose
+de producao sem portas de dados publicadas. A reconciliacao e o quality gate da
+base persistente permanecem como validacao operacional final. O plano consolidado esta em
+[Revisao final e roadmap de entrega](docs/FINAL_REVIEW_AND_ROADMAP.md).

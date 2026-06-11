@@ -524,3 +524,104 @@ Consultas podem ser restringidas ao equipamento correto e respostas recebem
 contexto técnico mais rico. Heuristicas continuam aproximadas e devem evoluir
 com novos fabricantes. Diagramas, tabelas complexas e PDFs apenas em imagem
 ainda precisam de pipeline multimodal/OCR.
+
+## ADR: Gate de relevancia e PostgreSQL como fonte da reconciliacao vetorial
+
+### Status
+
+Aceito e implementado na Sprint 13.
+
+### Contexto
+
+O Qdrant normalmente retorna os melhores resultados mesmo quando todos possuem
+baixa relevancia. Alem disso, ciclos anteriores de indexacao podem deixar
+pontos orfaos que causam fontes duplicadas e reprovam o quality gate.
+
+### Decisao
+
+Filtrar resultados abaixo de `RAG_MIN_RELEVANCE_SCORE` antes do prompting e
+recusar perguntas que citam fabricante ou modelo incompatível com as fontes.
+Considerar chunks de documentos `indexed` no PostgreSQL como fonte de verdade
+para o comando idempotente `reconcile_qdrant`. O comando executa dry-run por
+padrao e exige `--apply` para remover orfaos ou reindexar ausentes.
+
+### Alternativas consideradas
+
+- Confiar apenas nas instrucoes do prompt: nao impede a LLM de receber contexto
+  irrelevante.
+- Apagar e recriar toda a colecao: simples, mas caro e indisponibiliza o acervo.
+- Tratar Qdrant como fonte de verdade: preservaria vetores sem rastreabilidade
+  relacional e dificultaria auditoria.
+
+### Consequencias
+
+Consultas fracas ou incompatíveis deixam de chamar a LLM e a colecao pode ser
+limpa com impacto controlado. O score inicial `0.35` exige calibracao continua,
+e a deteccao explícita de modelos depende das heuristicas do domínio.
+
+## ADR: Arquivo original persistido e pipeline integral no worker
+
+### Status
+
+Aceito e implementado na Sprint 14.
+
+### Contexto
+
+Extracao e chunking de manuais extensos ocupavam a requisicao HTTP, aumentando
+latencia, risco de timeout e carga na API. Sem o arquivo original persistido,
+reprocessar também exigia novo upload.
+
+### Decisao
+
+Calcular o hash em streaming, persistir o arquivo em `Document.file` e
+compartilhar o volume `document_uploads` entre API e worker. O `IndexingJob`
+executa extracao, chunking e indexacao. Metadados corrigidos sao propagados aos
+chunks e provocam reindexacao.
+
+### Alternativas consideradas
+
+- Manter extracao sincrona e indexar no worker: preserva carga e timeout na API.
+- Criar filas e modelos separados por etapa: maior controle, mas complexidade
+  prematura para o MVP.
+- Object storage externo: melhor para escala, mas adiciona infraestrutura.
+
+### Consequencias
+
+Uploads retornam rapidamente e o pipeline pode ser repetido de forma
+idempotente. API e worker precisam compartilhar armazenamento persistente.
+Extratores atuais ainda podem carregar conteúdo no worker; arquivos muito
+maiores devem considerar processamento incremental ou object storage.
+
+## ADR: Auditoria minimizada e perfil Compose de producao
+
+### Status
+
+Aceito e implementado na Sprint 15.
+
+### Contexto
+
+Consultas tecnicas precisam ser rastreaveis, mas perguntas podem conter dados
+sensíveis. O Compose local tambem publica portas uteis ao desenvolvimento que
+nao devem permanecer acessiveis em producao.
+
+### Decisao
+
+Persistir identidade ou metodo de autenticacao, filtros, hash da pergunta e
+fontes com chunk, pagina e metadados. O texto da pergunta fica desativado por
+padrao. Aplicar retencao somente por comando explícito com dry-run inicial.
+Manter um override Compose de producao que exige segredos, ativa configuracoes
+HTTPS e remove portas de PostgreSQL e Qdrant.
+
+### Alternativas consideradas
+
+- Persistir todas as perguntas: facilita investigacao, mas amplia risco e
+  obrigacoes de privacidade.
+- Nao guardar auditoria: reduz dados, mas impede rastrear respostas tecnicas.
+- Usar um Compose unico fechado: dificulta diagnostico e desenvolvimento local.
+
+### Consequências
+
+Consultas podem ser correlacionadas com menor exposicao de conteúdo, e a
+retencao e revisavel antes da remocao. Investigar o texto exato exige habilitar
+uma opcao sensível. O perfil de producao ainda depende de proxy TLS, gestao de
+segredos e backups fornecidos pelo ambiente alvo.

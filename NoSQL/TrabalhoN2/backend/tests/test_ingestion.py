@@ -1,3 +1,6 @@
+from types import SimpleNamespace
+from unittest.mock import patch
+
 import pytest
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import override_settings
@@ -9,6 +12,11 @@ from apps.documents.services import DocumentIngestionError, DocumentIngestionSer
 
 
 pytestmark = pytest.mark.django_db
+
+
+@pytest.fixture(autouse=True)
+def document_media(tmp_path, settings):
+    settings.MEDIA_ROOT = tmp_path
 
 
 def text_upload(name: str = "guia.md") -> SimpleUploadedFile:
@@ -30,6 +38,7 @@ def test_ingestion_service_persists_document_and_chunks() -> None:
     assert result.document.title == "Guia tecnico"
     assert result.document.status == DocumentStatus.CHUNKED
     assert result.document.chunks.count() > 1
+    assert result.document.file
 
 
 def test_ingestion_service_returns_existing_duplicate() -> None:
@@ -55,18 +64,21 @@ def test_ingestion_failure_is_auditable() -> None:
     assert "UTF-8" in document.error_message
 
 
-@override_settings(RAG_CHUNK_SIZE=100, RAG_CHUNK_OVERLAP=20)
-def test_ingestion_endpoint_returns_document_summary() -> None:
+@patch("apps.rag.tasks.index_document_task.delay")
+def test_ingestion_endpoint_stages_document_and_enqueues_pipeline(delay_mock) -> None:
+    delay_mock.return_value = SimpleNamespace(id="celery-ingest")
     response = APIClient().post(
         "/api/documents/ingest",
         {"file": text_upload(), "title": "Documento API"},
         format="multipart",
     )
 
-    assert response.status_code == status.HTTP_201_CREATED
-    assert response.json()["status"] == DocumentStatus.CHUNKED
-    assert response.json()["chunk_count"] > 1
+    assert response.status_code == status.HTTP_202_ACCEPTED
+    assert response.json()["document"]["status"] == DocumentStatus.PENDING
+    assert response.json()["document"]["chunk_count"] == 0
+    assert response.json()["job"]["status"] == "queued"
     assert response.json()["duplicate"] is False
+    delay_mock.assert_called_once()
 
 
 def test_ingestion_endpoint_rejects_unsupported_file() -> None:

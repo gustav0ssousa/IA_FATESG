@@ -81,6 +81,17 @@ def test_evaluator_measures_refusal_for_unanswerable_case() -> None:
     assert evaluation["summary"]["retrieval_hit_rate"] is None
 
 
+def test_evaluator_fails_gate_when_unanswerable_case_is_not_refused() -> None:
+    evaluation = RAGEvaluator(FakeSearch(), FakeQuery()).evaluate(
+        [case(answerable=False)],
+        top_k=2,
+    )
+
+    assert evaluation["summary"]["refusal_accuracy"] == 0.0
+    assert evaluation["quality_gate"]["checks"]["refusal_accuracy"]["passed"] is False
+    assert evaluation["quality_gate"]["passed"] is False
+
+
 def test_evaluator_records_generation_error_and_fails_gate() -> None:
     class FailingQuery:
         def answer(self, question, top_k):

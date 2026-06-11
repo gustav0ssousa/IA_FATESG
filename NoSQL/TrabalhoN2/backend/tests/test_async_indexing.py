@@ -2,10 +2,13 @@ from types import SimpleNamespace
 from unittest.mock import patch
 
 import pytest
+from django.core.files.uploadedfile import SimpleUploadedFile
+from django.test import override_settings
 from rest_framework import status
 from rest_framework.test import APIClient
 
 from apps.documents.models import Document, DocumentStatus
+from apps.documents.services import DocumentIngestionService
 from apps.rag.async_indexing import AsyncIndexingError, AsyncIndexingService
 from apps.rag.models import IndexingJob, IndexingJobStatus
 from apps.rag.tasks import index_document_task
@@ -73,6 +76,33 @@ def test_task_completes_job(build_services_mock) -> None:
     assert job.indexed_chunks == 2
     assert job.started_at is not None
     assert job.finished_at is not None
+
+
+@patch(
+    "apps.rag.tasks.build_services",
+    return_value=(FakeIndexingService(), object()),
+)
+@override_settings(RAG_CHUNK_SIZE=100, RAG_CHUNK_OVERLAP=20)
+def test_task_processes_staged_file_before_indexing(
+    build_services_mock,
+    tmp_path,
+    settings,
+) -> None:
+    settings.MEDIA_ROOT = tmp_path
+    document = DocumentIngestionService().stage(
+        SimpleUploadedFile(
+            "manual.md",
+            ("# Manual\n\nProcedimento tecnico. " * 20).encode(),
+        )
+    ).document
+    job = IndexingJob.objects.create(document=document)
+
+    result = index_document_task.run(str(job.id))
+
+    document.refresh_from_db()
+    assert result == 2
+    assert document.chunks.exists()
+    assert document.status == DocumentStatus.INDEXED
 
 
 @patch("apps.rag.tasks.settings.CELERY_INDEXING_MAX_RETRIES", 0)

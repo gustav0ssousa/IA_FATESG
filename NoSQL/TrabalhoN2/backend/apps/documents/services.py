@@ -26,14 +26,17 @@ class IngestionResult:
 
 
 class DocumentIngestionService:
-    def ingest(
+    def stage(
         self,
         uploaded_file: UploadedFile,
         title: str = "",
         metadata: dict | None = None,
     ) -> IngestionResult:
-        content = uploaded_file.read()
-        content_hash = hashlib.sha256(content).hexdigest()
+        digest = hashlib.sha256()
+        for chunk in uploaded_file.chunks():
+            digest.update(chunk)
+        content_hash = digest.hexdigest()
+        uploaded_file.seek(0)
         existing = DocumentRepository.get_by_content_hash(content_hash)
         if existing:
             return IngestionResult(document=existing, created=False)
@@ -44,18 +47,30 @@ class DocumentIngestionService:
             source_name=source_name,
             source_type=Path(source_name).suffix.lower().lstrip("."),
             content_hash=content_hash,
-            status=DocumentStatus.PROCESSING,
-            metadata={"file_size": len(content), **(metadata or {})},
+            file=uploaded_file,
+            status=DocumentStatus.PENDING,
+            metadata={"file_size": uploaded_file.size, **(metadata or {})},
         )
+        return IngestionResult(document=document, created=True)
 
+    def process(self, document: Document) -> Document:
+        if not document.file:
+            raise DocumentIngestionError("O arquivo original nao esta disponivel.")
+        document.status = DocumentStatus.PROCESSING
+        document.error_message = ""
+        document.save(update_fields=["status", "error_message", "updated_at"])
         try:
-            sections = ExtractorRegistry.get_for_filename(source_name).extract(content)
-            inferred_metadata = infer_technical_document_metadata(sections, source_name)
+            with document.file.open("rb") as stored_file:
+                content = stored_file.read()
+            sections = ExtractorRegistry.get_for_filename(document.source_name).extract(content)
+            inferred_metadata = infer_technical_document_metadata(
+                sections, document.source_name
+            )
             document.metadata = {
                 **inferred_metadata,
                 **document.metadata,
             }
-            if not title.strip() and inferred_metadata["suggested_title"]:
+            if document.title == Path(document.source_name).stem and inferred_metadata["suggested_title"]:
                 document.title = inferred_metadata["suggested_title"]
             sections = enrich_technical_sections(sections, document.metadata)
             chunker = LangChainTextChunker(
@@ -78,5 +93,45 @@ class DocumentIngestionService:
             document.error_message = str(error)
             document.save(update_fields=["status", "error_message", "updated_at"])
             raise DocumentIngestionError(str(error)) from error
+        return document
 
-        return IngestionResult(document=document, created=True)
+    def ingest(
+        self,
+        uploaded_file: UploadedFile,
+        title: str = "",
+        metadata: dict | None = None,
+    ) -> IngestionResult:
+        result = self.stage(uploaded_file, title=title, metadata=metadata)
+        if result.created:
+            self.process(result.document)
+        return result
+
+
+class DocumentMetadataService:
+    technical_fields = (
+        "domain",
+        "manufacturer",
+        "models",
+        "equipment_type",
+        "manual_type",
+        "language",
+    )
+
+    def update(self, document: Document, *, title: str | None, metadata: dict) -> Document:
+        if title is not None:
+            document.title = title
+        document.metadata = {**document.metadata, **metadata}
+        for chunk in document.chunks.all():
+            chunk.metadata = {
+                **chunk.metadata,
+                **{
+                    key: document.metadata[key]
+                    for key in self.technical_fields
+                    if key in document.metadata
+                },
+            }
+            chunk.save(update_fields=["metadata"])
+        if document.chunks.exists():
+            document.status = DocumentStatus.CHUNKED
+        document.save(update_fields=["title", "metadata", "status", "updated_at"])
+        return document

@@ -213,3 +213,53 @@ Escopo:
 - Filtros de consulta por metadados tecnicos.
 - Prompt orientado a suporte tecnico e seguranca.
 - Avaliacao e documentacao do domínio.
+
+## Roadmap final de entrega
+
+O detalhamento, os achados da revisao e a Definition of Done estao em
+[`FINAL_REVIEW_AND_ROADMAP.md`](FINAL_REVIEW_AND_ROADMAP.md).
+
+### Sprint 13 - Gate de Confiabilidade
+
+Status: concluida em codigo e testes. Aplicacao da reconciliacao e certificacao
+do quality gate na base real pendentes; o dry-run identificou `1` vetor orfao
+legado, sem remocao automatica.
+
+Objetivo: impedir respostas sem contexto suficiente e aprovar integralmente o
+quality gate do RAG.
+
+Escopo previsto:
+
+- Limiar minimo de relevancia e resposta de recusa implementados.
+- Reconciliacao idempotente entre PostgreSQL e Qdrant implementada.
+- Testes negativos implementados; reexecucao da avaliacao tecnica pendente no
+  ambiente persistente.
+
+### Sprint 14 - Ingestao Assincrona e Ciclo de Vida
+
+Status: concluida com upload persistido, pipeline integral no worker,
+reprocessamento e revisao de metadados no backend e frontend. A pilha Docker
+completa foi reconstruida e validada com os servicos saudaveis.
+
+Objetivo: processar manuais grandes fora da requisicao HTTP e permitir
+reprocessamento e correcao de metadados.
+
+Escopo previsto:
+
+- Persistencia do upload e pipeline integral no worker implementados.
+- Estados, retentativas e reprocessamento idempotente implementados.
+- Revisao e edicao de metadados tecnicos implementadas no backend e frontend.
+
+### Sprint 15 - Auditoria, Deploy e Fechamento
+
+Status: concluida em codigo e validacoes automatizadas.
+
+Objetivo: fechar rastreabilidade, seguranca operacional e criterios de entrega.
+
+Escopo previsto:
+
+- Auditoria por usuario, autenticacao, filtros, chunks, paginas e metadados.
+- Politica executavel de retencao e redacao da pergunta por padrao.
+- Override Compose de producao com portas de dados removidas.
+- Biblioteca paginada com facets globais de fabricante/modelo.
+- Validacao automatizada de backend, frontend e perfis Compose.

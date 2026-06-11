@@ -12,6 +12,7 @@ DEFAULT_THRESHOLDS = {
     "mean_reciprocal_rank": 0.70,
     "citation_rate": 0.80,
     "mean_answer_term_recall": 0.60,
+    "refusal_accuracy": 1.0,
 }
 
 

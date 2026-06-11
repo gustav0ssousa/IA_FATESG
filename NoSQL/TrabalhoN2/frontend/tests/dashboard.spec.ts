@@ -22,10 +22,10 @@ test.beforeEach(async ({ page }) => {
   await page.route("**/backend-api/auth/config", (route) =>
     route.fulfill({ json: { required: false } }),
   );
-  await page.route("**/backend-api/documents", (route) =>
+  await page.route("**/backend-api/documents**", (route) =>
     route.fulfill({
-      json: [
-        {
+      json: {
+        results: [{
           id: "document-1",
           title: "Brother - DCP-L5510DN + 24 models - Service Manual",
           source_name: "sm_elfb_e_ver2.pdf",
@@ -38,8 +38,13 @@ test.beforeEach(async ({ page }) => {
             equipment_type: "multifunction",
             manual_type: "service_manual",
           },
+        }],
+        pagination: { page: 1, page_size: 25, total: 1, total_pages: 1 },
+        facets: {
+          manufacturers: ["Brother"],
+          models: ["MFC-L5710DN", "MFC-L5715DW", "DCP-L5510DN"],
         },
-      ],
+      },
     }),
   );
   await page.route("**/backend-api/rag/query", (route) =>

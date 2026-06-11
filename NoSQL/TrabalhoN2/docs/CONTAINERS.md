@@ -2,18 +2,18 @@
 
 ## Visao geral
 
-O ambiente completo executa com Docker Compose. Apenas o dashboard e a API sao
-publicados no host; bancos e broker permanecem isolados na rede interna.
+O ambiente completo executa com Docker Compose. O perfil local publica portas
+de diagnostico; o override de producao mantem dados e broker na rede interna.
 
 | Servico | Imagem | Porta no host | Responsabilidade |
 | --- | --- | --- | --- |
 | `frontend` | `adaptive-rag-frontend:local` | `3000` | Dashboard Next.js e proxy para a API |
 | `api` | `adaptive-rag-backend:local` | `8000` | API Django REST e migrations |
-| `worker` | `adaptive-rag-backend:local` | nenhuma | Indexacao assíncrona Celery |
+| `worker` | `adaptive-rag-backend:local` | nenhuma | Extracao, chunking e indexacao assíncronos |
 | `embeddings` | `adaptive-rag-backend:local` | nenhuma | Modelo ONNX compartilhado internamente |
 | `embedding-cache-init` | `alpine:3.22` | nenhuma | Prepara permissoes do volume de embeddings |
 | `postgres` | `postgres:17-alpine` | `POSTGRES_HOST_PORT` (`5432` por padrao) | Dados estruturados e jobs |
-| `qdrant` | `qdrant/qdrant:v1.18.0` | nenhuma | Embeddings e busca vetorial |
+| `qdrant` | `qdrant/qdrant:v1.18.0` | `6333`/`6334` apenas no perfil local | Embeddings e busca vetorial |
 | `rabbitmq` | `rabbitmq:4.2-management-alpine` | nenhuma | Broker de tarefas |
 
 API, worker e embeddings compartilham a mesma imagem para evitar builds
@@ -34,6 +34,7 @@ redundantes. Os containers da aplicacao executam com usuarios sem privilegios.
 - `qdrant_data`: colecoes e vetores.
 - `rabbitmq_data`: estado do broker.
 - `embedding_cache`: modelo de embedding compartilhado entre API e worker.
+- `document_uploads`: arquivos originais compartilhados entre API e worker.
 
 O servico curto `embedding-cache-init` prepara esse volume para o UID sem
 privilegios usado pelo backend e termina antes de API e worker iniciarem.
@@ -97,6 +98,34 @@ docker compose exec api python manage.py check
 docker compose restart worker
 docker compose down
 ```
+
+## Perfil de producao
+
+O override exige hosts, chave secreta e chave administrativa; ativa
+autenticacao, cookies/redirect HTTPS e remove portas de PostgreSQL e Qdrant:
+
+```bash
+export DJANGO_ALLOWED_HOSTS=rag.example.com
+export DJANGO_SECRET_KEY='valor-longo-e-aleatorio'
+export API_ACCESS_KEY='valor-longo-e-rotacionavel'
+docker compose -f docker-compose.yml -f docker-compose.prod.yml config
+docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+```
+
+API e frontend ficam publicados somente em `127.0.0.1`, preparados para um
+proxy reverso com TLS. RabbitMQ e embeddings continuam sem porta no host.
+
+## Backup e retencao
+
+Exemplo de backup logico do PostgreSQL:
+
+```bash
+docker compose exec -T postgres pg_dump -U "$POSTGRES_USER" "$POSTGRES_DB" > rag.sql
+```
+
+Qdrant deve ser protegido com snapshots da colecao e os arquivos originais com
+backup do volume `document_uploads`. A auditoria antiga pode ser inspecionada e
+removida com `purge_rag_audit`; a remocao real exige `--apply`.
 
 Para reconstruir apenas a aplicacao:
 

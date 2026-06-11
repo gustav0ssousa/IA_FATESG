@@ -29,20 +29,30 @@ class IndexingJobAdmin(admin.ModelAdmin):
 class RAGQuerySourceInline(admin.TabularInline):
     model = RAGQuerySource
     extra = 0
-    readonly_fields = ("document_id", "source_name", "rank", "score")
+    readonly_fields = (
+        "document_id",
+        "chunk_id",
+        "source_name",
+        "page_number",
+        "metadata",
+        "rank",
+        "score",
+    )
 
 
 @admin.register(RAGQueryRecord)
 class RAGQueryRecordAdmin(admin.ModelAdmin):
     list_display = (
         "request_id",
+        "user",
+        "authentication_method",
         "status",
         "model",
         "source_count",
         "duration_ms",
         "created_at",
     )
-    list_filter = ("status", "model", "created_at")
-    search_fields = ("request_id", "question", "error_message")
+    list_filter = ("status", "authentication_method", "model", "created_at")
+    search_fields = ("request_id", "question", "question_hash", "user__username", "error_message")
     readonly_fields = ("id", "request_id", "created_at")
     inlines = (RAGQuerySourceInline,)

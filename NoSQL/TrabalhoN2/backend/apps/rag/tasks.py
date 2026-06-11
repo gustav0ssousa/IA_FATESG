@@ -2,6 +2,8 @@ from celery import shared_task
 from django.conf import settings
 from django.utils import timezone
 
+from apps.documents.models import DocumentStatus
+from apps.documents.services import DocumentIngestionService
 from apps.rag.models import IndexingJob, IndexingJobStatus
 from apps.rag.services import build_services
 
@@ -28,6 +30,8 @@ def index_document_task(self, job_id: str) -> int | None:
     )
 
     try:
+        if job.document.status not in (DocumentStatus.CHUNKED, DocumentStatus.INDEXED):
+            DocumentIngestionService().process(job.document)
         indexed_chunks = build_services()[0].index(job.document)
     except Exception as error:
         return _retry_or_fail(self, job, error)

@@ -19,13 +19,14 @@ Confirme que todos os servicos estao saudaveis e abra
 3. Em **Chat**, pergunte: `O que verificar no papel antes de iniciar o troubleshooting?`
 4. Abra as fontes e mostre pagina, secao tecnica, score e trecho.
 5. Em **Indicadores**, mostre latencia, taxa de erro e documentos recuperados.
-6. Mostre a correlacao operacional:
+6. Em **Documentos**, mostre paginacao, cobertura e facets globais.
+7. Mostre a correlacao operacional:
 
 ```bash
 docker compose logs --tail=30 api
 ```
 
-7. Execute os checks principais:
+8. Execute os checks principais:
 
 ```bash
 .venv/bin/pytest -q
@@ -64,6 +65,9 @@ administrativos.
 - FastEmbed gera embeddings locais; Maritaca gera respostas fundamentadas.
 - LangChain foi usado somente no splitter, atras de servicos proprios.
 - Fontes e `request_id` tornam respostas e operacao rastreaveis.
+- Auditoria registra identidade, filtros, chunks e paginas sem guardar a
+  pergunta integral por padrao.
 - Tokens DRF identificam usuarios e `is_staff` separa leitura de administracao.
 - O manual Brother de 513 paginas e classificado por modelo, secao, erro e seguranca.
 - Filtros por modelo reduzem o risco de misturar procedimentos de equipamentos.
+- O override `docker-compose.prod.yml` remove portas de PostgreSQL e Qdrant.

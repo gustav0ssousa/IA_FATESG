@@ -1,4 +1,5 @@
 import logging
+import hashlib
 import time
 import uuid
 from functools import lru_cache
@@ -12,7 +13,7 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from apps.common.permissions import AuthenticatedOrAPIKey, StaffOrAPIKey
+from apps.common.permissions import AuthenticatedOrAPIKey, StaffOrAPIKey, has_valid_api_key
 from apps.documents.models import Document
 from apps.rag.async_indexing import AsyncIndexingError, AsyncIndexingService
 from apps.rag.embeddings import FastEmbedProvider
@@ -47,6 +48,25 @@ def technical_filters(validated_data: dict) -> dict:
         key: validated_data[key]
         for key in TECHNICAL_FILTER_FIELDS
         if validated_data.get(key)
+    }
+
+
+def query_audit_fields(request: Request, question: str, filters: dict) -> dict:
+    if request.user.is_authenticated:
+        authentication_method = "token"
+        user = request.user
+    elif has_valid_api_key(request):
+        authentication_method = "api_key"
+        user = None
+    else:
+        authentication_method = "local_anonymous"
+        user = None
+    return {
+        "user": user,
+        "authentication_method": authentication_method,
+        "question": question if settings.AUDIT_STORE_QUESTION_TEXT else "",
+        "question_hash": hashlib.sha256(question.encode("utf-8")).hexdigest(),
+        "filters": filters,
     }
 
 
@@ -195,9 +215,10 @@ class RAGQueryView(APIView):
         request._request.request_id = request_id
         question = serializer.validated_data["question"]
         top_k = serializer.validated_data.get("top_k", settings.RAG_TOP_K)
+        filters = technical_filters(serializer.validated_data)
+        audit_fields = query_audit_fields(request, question, filters)
         started_at = time.perf_counter()
         try:
-            filters = technical_filters(serializer.validated_data)
             query_service = build_rag_query_service()
             result = (
                 query_service.answer(question=question, top_k=top_k, filters=filters)
@@ -208,7 +229,7 @@ class RAGQueryView(APIView):
             duration_ms = round((time.perf_counter() - started_at) * 1000)
             RAGQueryRecord.objects.create(
                 request_id=request_id,
-                question=question,
+                **audit_fields,
                 status=QueryStatus.ERROR,
                 top_k=top_k,
                 duration_ms=duration_ms,
@@ -234,7 +255,7 @@ class RAGQueryView(APIView):
         with transaction.atomic():
             record = RAGQueryRecord.objects.create(
                 request_id=request_id,
-                question=question,
+                **audit_fields,
                 status=QueryStatus.SUCCESS,
                 model=result["model"] or "",
                 top_k=top_k,
@@ -247,7 +268,10 @@ class RAGQueryView(APIView):
                     RAGQuerySource(
                         query=record,
                         document_id=source["document_id"],
+                        chunk_id=source.get("chunk_id", ""),
                         source_name=source["source_name"],
+                        page_number=source.get("page_number"),
+                        metadata=source.get("metadata", {}),
                         rank=source["number"],
                         score=source["score"],
                     )

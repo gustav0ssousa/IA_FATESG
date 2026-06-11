@@ -8,6 +8,7 @@ postgres_data/
 .coverage
 htmlcov/
 outputs/
+backend/media/
 .idea/
 .vscode/
 frontend/node_modules/

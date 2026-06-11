@@ -114,6 +114,57 @@ def test_rag_query_service_does_not_call_llm_without_context() -> None:
     assert llm.calls == []
 
 
+def test_rag_query_service_refuses_incompatible_explicit_manufacturer() -> None:
+    llm = FakeLLM()
+    brother_source = source()
+    brother_source = SearchResult(
+        **{
+            **brother_source.__dict__,
+            "metadata": {
+                "manufacturer": "Brother",
+                "models": ["MFC-L5710DN"],
+            },
+        }
+    )
+    service = RAGQueryService(
+        search_service=FakeSearchService([brother_source]),
+        prompt_builder=PromptBuilder(max_context_chars=1000),
+        llm=llm,
+    )
+
+    result = service.answer(
+        "Como substituir a cabeca de impressao da Epson L3250?",
+        top_k=5,
+    )
+
+    assert result["sources"] == []
+    assert result["model"] is None
+    assert llm.calls == []
+
+
+def test_rag_query_service_refuses_incompatible_explicit_model() -> None:
+    llm = FakeLLM()
+    brother_source = SearchResult(
+        **{
+            **source().__dict__,
+            "metadata": {
+                "manufacturer": "Brother",
+                "models": ["MFC-L5710DN"],
+            },
+        }
+    )
+    service = RAGQueryService(
+        search_service=FakeSearchService([brother_source]),
+        prompt_builder=PromptBuilder(max_context_chars=1000),
+        llm=llm,
+    )
+
+    result = service.answer("Como reparar a Brother MFC-L9999DW?", top_k=5)
+
+    assert result["sources"] == []
+    assert llm.calls == []
+
+
 def test_maritaca_provider_uses_responses_api_parameters() -> None:
     client = FakeOpenAIClient()
     provider = MaritacaProvider(

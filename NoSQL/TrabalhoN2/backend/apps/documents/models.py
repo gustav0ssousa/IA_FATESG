@@ -17,6 +17,7 @@ class Document(models.Model):
     source_name = models.CharField(max_length=500)
     source_type = models.CharField(max_length=50)
     content_hash = models.CharField(max_length=64, unique=True)
+    file = models.FileField(upload_to="documents/%Y/%m/", blank=True)
     status = models.CharField(
         max_length=20,
         choices=DocumentStatus.choices,

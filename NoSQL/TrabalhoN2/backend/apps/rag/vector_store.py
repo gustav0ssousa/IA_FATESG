@@ -1,4 +1,4 @@
-from collections.abc import Sequence
+from collections.abc import Collection, Sequence
 from dataclasses import dataclass
 from typing import Protocol
 
@@ -16,6 +16,19 @@ class SearchResult:
     source_name: str
     page_number: int | None
     metadata: dict
+
+
+@dataclass(frozen=True)
+class VectorReconciliationReport:
+    expected_chunks: int
+    scanned_points: int
+    orphan_point_ids: tuple[str, ...]
+    missing_chunk_ids: tuple[str, ...]
+    deleted_points: int = 0
+
+    @property
+    def consistent(self) -> bool:
+        return not self.orphan_point_ids and not self.missing_chunk_ids
 
 
 class VectorStore(Protocol):
@@ -135,3 +148,64 @@ class QdrantVectorStore:
             )
             for point in response.points
         ]
+
+    def reconcile(
+        self,
+        expected_chunk_ids: Collection[str],
+        *,
+        apply: bool = False,
+        batch_size: int = 256,
+    ) -> VectorReconciliationReport:
+        if batch_size < 1:
+            raise ValueError("O tamanho do lote deve ser maior que zero.")
+
+        expected = {str(chunk_id) for chunk_id in expected_chunk_ids}
+        if not self._client.collection_exists(self._collection_name):
+            return VectorReconciliationReport(
+                expected_chunks=len(expected),
+                scanned_points=0,
+                orphan_point_ids=(),
+                missing_chunk_ids=tuple(sorted(expected)),
+            )
+
+        seen: set[str] = set()
+        orphan_ids: list[str] = []
+        orphan_point_ids = []
+        offset = None
+        scanned_points = 0
+        while True:
+            points, offset = self._client.scroll(
+                collection_name=self._collection_name,
+                limit=batch_size,
+                offset=offset,
+                with_payload=["chunk_id"],
+                with_vectors=False,
+            )
+            for point in points:
+                scanned_points += 1
+                point_id = str(point.id)
+                chunk_id = str((point.payload or {}).get("chunk_id", ""))
+                if chunk_id in expected and point_id == chunk_id:
+                    seen.add(chunk_id)
+                else:
+                    orphan_ids.append(point_id)
+                    orphan_point_ids.append(point.id)
+            if offset is None:
+                break
+
+        if apply:
+            for start in range(0, len(orphan_ids), batch_size):
+                self._client.delete(
+                    collection_name=self._collection_name,
+                    points_selector=models.PointIdsList(
+                        points=orphan_point_ids[start : start + batch_size]
+                    ),
+                )
+
+        return VectorReconciliationReport(
+            expected_chunks=len(expected),
+            scanned_points=scanned_points,
+            orphan_point_ids=tuple(sorted(orphan_ids)),
+            missing_chunk_ids=tuple(sorted(expected - seen)),
+            deleted_points=len(orphan_ids) if apply else 0,
+        )
