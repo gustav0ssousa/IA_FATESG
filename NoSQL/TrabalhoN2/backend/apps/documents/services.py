@@ -42,15 +42,20 @@ class DocumentIngestionService:
             return IngestionResult(document=existing, created=False)
 
         source_name = Path(uploaded_file.name).name
-        document = DocumentRepository.create(
-            title=title.strip() or Path(source_name).stem,
-            source_name=source_name,
-            source_type=Path(source_name).suffix.lower().lstrip("."),
-            content_hash=content_hash,
-            file=uploaded_file,
-            status=DocumentStatus.PENDING,
-            metadata={"file_size": uploaded_file.size, **(metadata or {})},
-        )
+        try:
+            document = DocumentRepository.create(
+                title=title.strip() or Path(source_name).stem,
+                source_name=source_name,
+                source_type=Path(source_name).suffix.lower().lstrip("."),
+                content_hash=content_hash,
+                file=uploaded_file,
+                status=DocumentStatus.PENDING,
+                metadata={"file_size": uploaded_file.size, **(metadata or {})},
+            )
+        except OSError as error:
+            raise DocumentIngestionError(
+                "O armazenamento de documentos nao esta disponivel."
+            ) from error
         return IngestionResult(document=document, created=True)
 
     def process(self, document: Document) -> Document:

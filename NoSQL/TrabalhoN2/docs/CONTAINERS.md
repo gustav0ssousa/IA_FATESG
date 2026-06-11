@@ -12,6 +12,7 @@ de diagnostico; o override de producao mantem dados e broker na rede interna.
 | `worker` | `adaptive-rag-backend:local` | nenhuma | Extracao, chunking e indexacao assíncronos |
 | `embeddings` | `adaptive-rag-backend:local` | nenhuma | Modelo ONNX compartilhado internamente |
 | `embedding-cache-init` | `alpine:3.22` | nenhuma | Prepara permissoes do volume de embeddings |
+| `document-storage-init` | `alpine:3.22` | nenhuma | Prepara permissoes do volume de documentos |
 | `postgres` | `postgres:17-alpine` | `POSTGRES_HOST_PORT` (`5432` por padrao) | Dados estruturados e jobs |
 | `qdrant` | `qdrant/qdrant:v1.18.0` | `6333`/`6334` apenas no perfil local | Embeddings e busca vetorial |
 | `rabbitmq` | `rabbitmq:4.2-management-alpine` | nenhuma | Broker de tarefas |
@@ -36,7 +37,7 @@ redundantes. Os containers da aplicacao executam com usuarios sem privilegios.
 - `embedding_cache`: modelo de embedding compartilhado entre API e worker.
 - `document_uploads`: arquivos originais compartilhados entre API e worker.
 
-O servico curto `embedding-cache-init` prepara esse volume para o UID sem
+Os servicos curtos `embedding-cache-init` e `document-storage-init` preparam os volumes para o UID sem
 privilegios usado pelo backend e termina antes de API e worker iniciarem.
 
 ## Subir e verificar

@@ -90,3 +90,19 @@ def test_ingestion_endpoint_rejects_unsupported_file() -> None:
 
     assert response.status_code == status.HTTP_400_BAD_REQUEST
     assert "Formato nao suportado" in str(response.json())
+
+
+@patch(
+    "apps.documents.repositories.Document.objects.create",
+    side_effect=PermissionError("storage denied"),
+)
+def test_ingestion_endpoint_reports_unavailable_document_storage(create_mock) -> None:
+    response = APIClient().post(
+        "/api/documents/ingest",
+        {"file": text_upload()},
+        format="multipart",
+    )
+
+    assert response.status_code == status.HTTP_503_SERVICE_UNAVAILABLE
+    assert response.json()["detail"] == "O armazenamento de documentos nao esta disponivel."
+    create_mock.assert_called_once()

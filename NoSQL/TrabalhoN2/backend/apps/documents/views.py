@@ -14,7 +14,11 @@ from apps.documents.serializers import (
     DocumentMetadataSerializer,
     DocumentSummarySerializer,
 )
-from apps.documents.services import DocumentIngestionService, DocumentMetadataService
+from apps.documents.services import (
+    DocumentIngestionError,
+    DocumentIngestionService,
+    DocumentMetadataService,
+)
 from apps.documents.technical import normalize_manufacturer, normalize_models
 from apps.rag.async_indexing import AsyncIndexingError, AsyncIndexingService
 from apps.rag.serializers import IndexingJobSerializer
@@ -51,6 +55,11 @@ class DocumentIngestionView(APIView):
             job = None
             if result.created or result.document.status != DocumentStatus.INDEXED:
                 job = AsyncIndexingService().enqueue(result.document)
+        except DocumentIngestionError as error:
+            return Response(
+                {"detail": str(error)},
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
         except AsyncIndexingError:
             return Response(
                 {"detail": "O documento foi salvo, mas o processamento nao pode ser enfileirado."},

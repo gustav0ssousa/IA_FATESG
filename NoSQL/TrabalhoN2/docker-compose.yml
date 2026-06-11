@@ -81,6 +81,15 @@ services:
     networks:
       - backend
 
+  document-storage-init:
+    image: alpine:3.22
+    command: ["chown", "-R", "10001:10001", "/media"]
+    volumes:
+      - document_uploads:/media
+    restart: "no"
+    networks:
+      - backend
+
   embeddings:
     <<: *backend-common
     environment:
@@ -138,6 +147,8 @@ services:
         condition: service_healthy
       embeddings:
         condition: service_healthy
+      document-storage-init:
+        condition: service_completed_successfully
     healthcheck:
       test:
         - CMD
@@ -169,6 +180,8 @@ services:
         condition: service_healthy
       embeddings:
         condition: service_healthy
+      document-storage-init:
+        condition: service_completed_successfully
     healthcheck:
       test: ["CMD-SHELL", "celery -A config inspect ping -d celery@$$HOSTNAME --timeout=5 | grep -q pong"]
       interval: 20s
