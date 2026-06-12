@@ -1,10 +1,12 @@
 import re
+import uuid
 from functools import lru_cache
 
 from django.conf import settings
+from django.db.models import Q
 from qdrant_client import QdrantClient
 
-from apps.documents.models import Document, DocumentStatus
+from apps.documents.models import Document, DocumentChunk, DocumentStatus
 from apps.documents.technical import KNOWN_MANUFACTURERS, extract_models
 from apps.rag.embeddings import EmbeddingProvider, FastEmbedProvider, RemoteEmbeddingProvider
 from apps.rag.generation import LLMProvider, MaritacaProvider
@@ -101,6 +103,80 @@ def _matches_explicit_equipment_scope(
     return not requested_models or not requested_models.isdisjoint(available_models)
 
 
+def _expand_adjacent_context(results: list[SearchResult]) -> list[SearchResult]:
+    valid_ids = []
+    for result in results:
+        try:
+            valid_ids.append(uuid.UUID(result.chunk_id))
+        except (TypeError, ValueError, AttributeError):
+            continue
+    anchors = {
+        str(chunk.id): chunk
+        for chunk in DocumentChunk.objects.select_related("document").filter(id__in=valid_ids)
+    }
+    neighbor_filter = Q()
+    for chunk in anchors.values():
+        positions = [position for position in (chunk.position - 1, chunk.position + 1) if position >= 0]
+        if positions:
+            neighbor_filter |= Q(
+                document_id=chunk.document_id,
+                page_number=chunk.page_number,
+                position__in=positions,
+            )
+    neighbors_by_anchor: dict[str, list[DocumentChunk]] = {}
+    if neighbor_filter:
+        neighbors = DocumentChunk.objects.select_related("document").filter(neighbor_filter)
+        for anchor_id, anchor in anchors.items():
+            neighbors_by_anchor[anchor_id] = [
+                chunk
+                for chunk in neighbors
+                if chunk.document_id == anchor.document_id
+                and chunk.page_number == anchor.page_number
+                and abs(chunk.position - anchor.position) == 1
+            ]
+
+    expanded: list[SearchResult] = []
+    seen = set()
+    for result in results:
+        if result.chunk_id not in seen:
+            expanded.append(result)
+            seen.add(result.chunk_id)
+        for chunk in sorted(
+            neighbors_by_anchor.get(result.chunk_id, []),
+            key=lambda item: item.position,
+        ):
+            chunk_id = str(chunk.id)
+            if chunk_id in seen:
+                continue
+            expanded.append(
+                SearchResult(
+                    chunk_id=chunk_id,
+                    document_id=str(chunk.document_id),
+                    score=result.score,
+                    content=chunk.content,
+                    source_name=chunk.document.source_name,
+                    page_number=chunk.page_number,
+                    metadata=chunk.metadata,
+                )
+            )
+            seen.add(chunk_id)
+    return expanded
+
+
+def _normalize_citations(answer: str, source_count: int) -> str:
+    def replace(match: re.Match) -> str:
+        numbers = [
+            int(value)
+            for value in re.findall(r"Fonte\s+(\d+)", match.group(0), re.IGNORECASE)
+        ]
+        valid_numbers = list(dict.fromkeys(
+            number for number in numbers if 1 <= number <= source_count
+        ))
+        return "".join(f"[Fonte {number}]" for number in valid_numbers) or match.group(0)
+
+    return re.sub(r"\[[^\]]*Fonte\s+\d+[^\]]*\]", replace, answer, flags=re.IGNORECASE)
+
+
 class RAGQueryService:
     def __init__(
         self,
@@ -127,6 +203,7 @@ class RAGQueryService:
                     "usage": {},
                 }
 
+            results = _expand_adjacent_context(results)
             prompt = self._prompt_builder.build(question, results)
             generation = self._llm.generate(
                 prompt.system_instruction,
@@ -136,7 +213,7 @@ class RAGQueryService:
             raise RAGQueryError(f"Falha ao consultar o RAG: {error}") from error
 
         return {
-            "answer": generation.text,
+            "answer": _normalize_citations(generation.text, len(prompt.used_sources)),
             "sources": [
                 {
                     "number": index,

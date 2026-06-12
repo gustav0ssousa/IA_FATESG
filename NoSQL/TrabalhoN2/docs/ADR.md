@@ -625,3 +625,39 @@ Consultas podem ser correlacionadas com menor exposicao de conteúdo, e a
 retencao e revisavel antes da remocao. Investigar o texto exato exige habilitar
 uma opcao sensível. O perfil de producao ainda depende de proxy TLS, gestao de
 segredos e backups fornecidos pelo ambiente alvo.
+
+## ADR: Expansao adjacente por pagina e normalizacao de citacoes
+
+### Status
+
+Aceito e implementado na Sprint 16.
+
+### Contexto
+
+A avaliacao real do manual mostrou que detalhes essenciais de uma mesma lista
+podem ficar em chunks consecutivos da mesma pagina. Tambem mostrou que a LLM
+pode produzir variacoes como `[Fonte 1, Fonte 2]` ou incluir pagina dentro dos
+colchetes, quebrando o contrato de citacao esperado pela avaliacao e interface.
+
+### Decisao
+
+Expandir resultados semanticos com os chunks imediatamente anterior e
+posterior somente quando pertencem ao mesmo documento e pagina. Normalizar
+citacoes geradas para referencias individuais no formato `[Fonte N]`, mantendo
+pagina e metadados no objeto estruturado de fontes.
+
+### Alternativas consideradas
+
+- Aumentar globalmente o tamanho dos chunks: reduz fragmentacao, mas prejudica
+  precisao, custo de contexto e reindexa todo o acervo.
+- Expandir entre paginas: recupera mais continuidade, mas aumenta o risco de
+  incluir secoes sem relacao.
+- Aceitar qualquer formato de citacao: simplifica o backend, mas fragiliza a
+  interface e as metricas automatizadas.
+
+### Consequências
+
+Respostas recebem mais contexto local e mantêm um contrato de citacao estavel.
+A consulta faz uma leitura adicional no PostgreSQL e pode aumentar o contexto
+enviado a LLM. A estrategia nao resolve tabelas, diagramas nem procedimentos
+que atravessam varias paginas.

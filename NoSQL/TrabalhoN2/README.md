@@ -5,23 +5,23 @@ funcional, modular e testavel, especializado inicialmente em suporte tecnico
 baseado em manuais de impressoras e scanners. A arquitetura preserva expansao
 para outros equipamentos e tecnologias.
 
-## Stack planejada
+## Stack atual
 
 | Campo | Definicao inicial |
 | --- | --- |
-| Linguagem | Python no backend; TypeScript se houver frontend |
+| Linguagem | Python no backend; TypeScript no frontend |
 | Framework backend | Django 5.2 LTS + Django REST Framework |
 | Framework frontend | Next.js 16 + React 19 + Tailwind CSS 4 |
 | LLM provider | Maritaca, com interface desacoplada para troca futura |
-| Modelo de embedding | A definir na implementacao; preferencia por modelo multilíngue adequado a portugues |
+| Modelo de embedding | `sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2` via FastEmbed |
 | Banco vetorial | Qdrant |
 | Banco relacional/documental | PostgreSQL |
 | Orquestracao RAG | Servicos proprios; `langchain-text-splitters` isolado no chunking |
 | Sistema de autenticacao | Django Auth + tokens DRF opcionais; chave de API para integracoes |
-| Infra/deploy | Docker Compose local; producao a definir |
+| Infra/deploy | Docker Compose local e override endurecido para ambiente alvo |
 | Observabilidade/logs | Logs JSON, histórico de queries e KPIs operacionais no dashboard |
 | Ambiente local | Pilha completa em Docker Compose; virtualenv opcional para desenvolvimento |
-| Ambiente producao | A definir; recomendacao futura: VPS/cloud com containers |
+| Ambiente producao | Template Compose preparado; provisionamento externo pendente |
 | Tipo de dados indexados | Manuais tecnicos, guias de servico, troubleshooting e documentos gerais |
 | Formatos de arquivos | MVP: `.txt`, `.md` e `.pdf`; futuro: `.docx`, `.csv`, paginas web |
 | Volume estimado de dados | Manuais extensos; exemplo validado com 513 paginas e 50 MB |
@@ -39,7 +39,7 @@ O foco inicial e responder duvidas de diagnostico, erros, manutencao,
 especificacoes e procedimentos de impressoras/scanners sem misturar orientacoes
 de modelos diferentes e preservando alertas de seguranca.
 
-## Arquitetura proposta
+## Arquitetura atual
 
 ```text
 Usuario/Dashboard
@@ -68,19 +68,16 @@ endpoint sincrono permanece disponivel para diagnostico e operacao local.
 No Compose, API e worker usam um servico interno de embeddings para compartilhar
 uma unica instancia do modelo ONNX.
 
-LangChain podera ser usado para integrar loaders, splitters, retrievers, prompts
-e chamadas de modelos. Regras de negocio, contratos da API e persistencia nao
-devem depender diretamente dele, reduzindo o custo de uma troca futura.
-
-No MVP, somente `langchain-text-splitters` foi adotado. Retrieval, prompting e
-providers permanecem em servicos proprios porque uma chain completa nao trouxe
-ganho proporcional para o fluxo linear atual.
+No MVP, somente `langchain-text-splitters` foi adotado. Retrieval, prompting,
+providers, regras de negocio, contratos da API e persistencia permanecem em
+servicos proprios. Uma chain completa nao trouxe ganho proporcional para o
+fluxo linear atual e aumentaria o acoplamento a APIs externas.
 
 ## Decisao de stack
 
 Django com Django REST Framework foi confirmado como backend na Sprint 1.
-LangChain permanece planejado para as sprints de RAG e sera encapsulado por
-interfaces proprias.
+LangChain ficou restrito ao splitter, encapsulado pelas interfaces proprias do
+projeto.
 
 ### Django + Django REST Framework
 
@@ -104,7 +101,7 @@ componentes RAG.
 **O que piora:** adiciona dependencias, abstracoes e risco de acoplamento a APIs
 que podem mudar. Por isso, seu uso sera limitado a adaptadores internos.
 
-## Fluxo RAG proposto
+## Fluxo RAG atual
 
 1. Receber arquivo ou documento.
 2. Extrair texto e metadados de origem.
@@ -120,7 +117,7 @@ que podem mudar. Por isso, seu uso sera limitado a adaptadores internos.
 12. Chamar Maritaca.
 13. Retornar resposta, fontes, trechos e metadados.
 
-## Estrutura inicial prevista
+## Estrutura principal
 
 ```text
 NoSQL/TrabalhoN2/
@@ -509,46 +506,3 @@ Os relatorios sao salvos em `outputs/evaluation/evaluation.json` e
 
 Pytest usa settings isolados com SQLite em memoria. Assim, a suite automatizada
 nao depende do PostgreSQL configurado no `.env`.
-
-Baseline inicial:
-
-- Retrieval relevante: Hit Rate `1.00`, MRR `1.00` e Precision@k `1.00`.
-- Geracao Maritaca: Citation Rate `1.00`, Answer Term Recall `1.00` e zero
-  erros de geracao.
-- O quality gate detectou vetores duplicados deixados por uma base relacional
-  anterior; reconciliacao PostgreSQL/Qdrant ficou pendente.
-- Quality gate final: reprovado apenas por Duplicate Result Rate `0.50`.
-
-## Documentacao
-
-- [Revisao final e roadmap de entrega](docs/FINAL_REVIEW_AND_ROADMAP.md)
-- [Sprint 0 - Analise e planejamento](docs/SPRINT_0.md)
-- [Sprint 1 - Fundacao backend](docs/SPRINT_1.md)
-- [Sprint 2 - Persistencia estruturada](docs/SPRINT_2.md)
-- [Sprint 3 - Ingestao, extracao e chunking](docs/SPRINT_3.md)
-- [Sprint 4 - Embeddings e Qdrant](docs/SPRINT_4.md)
-- [Sprint 5 - Consulta RAG e Maritaca](docs/SPRINT_5.md)
-- [Sprint 6 - Avaliacao minima](docs/SPRINT_6.md)
-- [Sprint 7 - Indexacao assíncrona](docs/SPRINT_7.md)
-- [Sprint 8 - Dashboard inicial](docs/SPRINT_8.md)
-- [Sprint 9 - KPIs e observabilidade](docs/SPRINT_9.md)
-- [Sprint 10 - Hardening e documentacao final](docs/SPRINT_10.md)
-- [Sprint 11 - Autenticacao e controle de acesso](docs/SPRINT_11.md)
-- [Sprint 12 - Especializacao em manuais tecnicos](docs/SPRINT_12.md)
-- [Sprint 13 - Gate de confiabilidade](docs/SPRINT_13.md)
-- [Sprint 14 - Ingestao assincrona e ciclo de vida](docs/SPRINT_14.md)
-- [Sprint 15 - Auditoria, deploy e fechamento](docs/SPRINT_15.md)
-- [Containers e operacao local](docs/CONTAINERS.md)
-- [Manuais tecnicos](docs/TECHNICAL_MANUALS.md)
-- [Seguranca](docs/SECURITY.md)
-- [Guia de demonstracao](docs/DEMO_GUIDE.md)
-- [Plano de sprints](docs/SPRINT_PLAN.md)
-- [Decisoes arquiteturais](docs/ADR.md)
-
-## Status
-
-Sprint 15 adicionou auditoria detalhada e redigida por padrao, politica
-executavel de retencao, biblioteca paginada com facets globais e perfil Compose
-de producao sem portas de dados publicadas. A reconciliacao e o quality gate da
-base persistente permanecem como validacao operacional final. O plano consolidado esta em
-[Revisao final e roadmap de entrega](docs/FINAL_REVIEW_AND_ROADMAP.md).

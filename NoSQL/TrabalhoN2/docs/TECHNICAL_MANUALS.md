@@ -79,6 +79,17 @@ Quando a pergunta cita explicitamente um fabricante conhecido ou um modelo
 identificavel, a geração somente acontece se ao menos uma fonte recuperada for
 compativel. Caso contrario, o sistema retorna uma recusa sem chamar a LLM.
 
+## Continuidade de contexto
+
+Depois do retrieval semantico, a consulta inclui os chunks imediatamente
+anterior e posterior quando pertencem ao mesmo documento e a mesma pagina.
+Essa expansao preserva detalhes de listas e procedimentos separados pelo limite
+de chunk sem misturar paginas diferentes. Os vizinhos herdam o score do
+resultado ancora e continuam identificados como fontes independentes.
+
+A LLM deve citar apenas `[Fonte N]`. Pagina, nome do manual, fabricante e demais
+metadados permanecem no objeto estruturado de fontes retornado pela API.
+
 ## Limitações
 
 - Heuristicas podem exigir ajuste para novas marcas e formatos.
@@ -90,3 +101,5 @@ compativel. Caso contrario, o sistema retorna uma recusa sem chamar a LLM.
   muito maiores podem exigir extracao incremental ou object storage.
 - Procedimentos de serviço podem exigir técnico qualificado e equipamentos de
   proteção; o RAG não substitui treinamento ou normas do fabricante.
+- Expansao adjacente cobre apenas a mesma pagina e nao substitui extracao
+  estruturada de procedimentos longos, tabelas ou referencias cruzadas.

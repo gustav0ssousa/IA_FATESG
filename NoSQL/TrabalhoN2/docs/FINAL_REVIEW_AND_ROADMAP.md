@@ -9,30 +9,26 @@ observabilidade e interface web. O backend possui boa cobertura automatizada e
 o frontend oferece chat, fontes, filtros tecnicos, biblioteca e operacao de
 documentos.
 
-O sistema ainda nao deve ser considerado pronto para uso tecnico sensivel ou
-producao. O limiar minimo e as recusas por incompatibilidade foram implementados
-na Sprint 13. A Sprint 14 moveu extracao, chunking e indexacao para o worker e
-adicionou revisao de metadados. A Sprint 15 completou auditoria detalhada,
-retencao, paginacao/facets e perfil Compose de producao. O bloqueio principal
-restante e revisar a divergencia encontrada na reconciliacao e certificar o
-quality gate na base persistente.
+O MVP foi certificado na Sprint 16 para a base controlada atual. A reconciliacao
+PostgreSQL/Qdrant ficou limpa e o quality gate de retrieval e geracao foi
+aprovado dentro da imagem containerizada. O sistema ainda nao substitui
+orientacao oficial ou avaliacao de tecnico qualificado e precisa de
+provisionamento operacional antes de producao.
 
 ## Estado validado
 
-Validacao executada em 10 de junho de 2026:
+Validacao consolidada em 12 de junho de 2026:
 
-- Backend: `81` testes aprovados apos a Sprint 15.
+- Backend: `85` testes aprovados apos a Sprint 16.
 - Django: `check` sem problemas e nenhuma migration pendente.
 - Frontend: lint e build de producao aprovados.
 - Frontend E2E: `8` cenarios desktop/mobile aprovados apos correcao responsiva.
 - Docker Compose: imagens reconstruidas e pilha completa saudavel; API e
   frontend responderam `200`.
-- Reconciliacao PostgreSQL/Qdrant: dry-run encontrou `1` vetor orfao legado e
-  nenhuma ausencia.
-- Quality gate RAG documentado: reprovado por Duplicate Result Rate `0.50`.
-
-A cobertura de modelos passou a ficar visivel em mobile, mas a suite E2E
-completa ainda precisa ser executada em ambiente com memoria suficiente.
+- Base controlada: `2` documentos, `803` chunks e `803` vetores.
+- Reconciliacao PostgreSQL/Qdrant: `0` orfaos e `0` ausentes.
+- Quality gate RAG na imagem: aprovado nos `4` casos tecnicos, com Citation Rate
+  `1.00`, Answer Term Recall `0.889` e Duplicate Result Rate `0.00`.
 
 ## Pontos fortes
 
@@ -47,21 +43,19 @@ completa ainda precisa ser executada em ambiente com memoria suficiente.
 
 ## Pendencias por prioridade
 
-### P0 - Bloqueiam a entrega
-
-1. Aplicar a reconciliacao PostgreSQL/Qdrant e certificar o quality gate.
-   O comando idempotente encontrou `1` vetor orfao em dry-run. Depois da revisao
-   e limpeza com `--apply`, o dataset tecnico deve passar integralmente.
-
-2. Certificar a suite E2E desktop/mobile.
-   A interface mobile foi ajustada, mas a execucao completa depende de ambiente
-   com memoria suficiente para Chromium e Next.js simultaneamente.
-
 ### P1 - Necessarias antes de producao
 
 1. Provisionar o ambiente alvo.
    Configurar proxy TLS, secrets manager ou equivalente, credenciais exclusivas,
    backups e restauracao testada usando o perfil Compose de producao.
+
+2. Fixar e revisar o baseline do modelo de embeddings.
+   A biblioteca FastEmbed instalada informou mudanca de pooling; uma atualizacao
+   pode alterar scores e exige reindexacao e nova avaliacao.
+
+3. Implementar exclusao consistente de documentos.
+   A operacao deve remover arquivo, chunks, jobs e vetores de forma idempotente
+   e auditavel.
 
 ### P2 - Evolucao recomendada
 
@@ -70,7 +64,7 @@ completa ainda precisa ser executada em ambiente com memoria suficiente.
   procedimentos e comportamento dos filtros.
 - Separar contagem total da biblioteca dos filtros ativos do chat.
 - Avaliar Git LFS ou armazenamento externo para manuais grandes.
-- Fechar explicitamente recursos PDF apos extracao.
+- Processar PDFs de forma incremental e fechar recursos explicitamente.
 
 ### P3 - Evolucao opcional
 
@@ -147,11 +141,11 @@ Aceite:
 
 ## Definition of Done da entrega final
 
-- [ ] Quality gate RAG integralmente aprovado.
+- [x] Quality gate RAG integralmente aprovado na base controlada.
 - [x] Backend, lint, build e E2E desktop/mobile aprovados.
 - [x] Recusa por baixa relevancia implementada e testada.
 - [x] Ingestao de documentos grandes processada de forma assincrona.
-- [ ] PostgreSQL e Qdrant reconciliados sem duplicatas ou orfaos.
+- [x] PostgreSQL e Qdrant reconciliados sem duplicatas ou orfaos.
 - [x] Auditoria registra identidade, filtros e fontes recuperadas.
 - [x] Metadados tecnicos podem ser revisados e corrigidos.
 - [x] Compose completo validado e perfil de producao sem exposicao de dados.
@@ -178,3 +172,6 @@ Mesmo apos o fechamento do MVP, respostas geradas nao substituem procedimentos
 oficiais nem avaliacao de um tecnico qualificado. Instrucoes envolvendo energia,
 calor, partes moveis, consumiveis ou desmontagem devem preservar alertas do
 manual, citar a fonte e recusar orientacao quando o contexto nao for suficiente.
+
+A classificacao final, arquitetura consolidada, lacunas e checklist de promocao
+para producao estao em [`FINAL_DELIVERY.md`](FINAL_DELIVERY.md).

@@ -4,9 +4,10 @@ import pytest
 from rest_framework import status
 from rest_framework.test import APIClient
 
+from apps.documents.models import Document, DocumentChunk
 from apps.rag.generation import GenerationResult, MaritacaProvider
 from apps.rag.prompting import PromptBuilder
-from apps.rag.services import RAGQueryService
+from apps.rag.services import RAGQueryService, _normalize_citations
 from apps.rag.vector_store import SearchResult
 
 pytestmark = pytest.mark.django_db
@@ -82,6 +83,28 @@ def test_prompt_builder_includes_sources_and_limits_context() -> None:
     assert len(prompt.used_sources) == 1
 
 
+def test_prompt_builder_requires_exact_citations_and_technical_terms() -> None:
+    prompt = PromptBuilder(max_context_chars=1000).build(
+        "O que verificar?",
+        [source("Use papel recomendado e verifique se esta umido.")],
+    )
+
+    assert "exatamente o formato [Fonte N]" in prompt.system_instruction
+    assert "Preserve os termos tecnicos essenciais" in prompt.system_instruction
+
+
+def test_citation_normalization_enforces_public_contract() -> None:
+    answer = (
+        "Use o procedimento [Fonte 1, Fonte 2]. "
+        "Consulte a pagina [Fonte 2, pagina 31] e ignore [Fonte 9]."
+    )
+
+    assert _normalize_citations(answer, source_count=2) == (
+        "Use o procedimento [Fonte 1][Fonte 2]. "
+        "Consulte a pagina [Fonte 2] e ignore [Fonte 9]."
+    )
+
+
 def test_rag_query_service_returns_answer_and_sources() -> None:
     llm = FakeLLM()
     service = RAGQueryService(
@@ -97,6 +120,57 @@ def test_rag_query_service_returns_answer_and_sources() -> None:
     assert result["sources"][0]["source_name"] == "guia.md"
     assert "[Fonte 1]" in result["answer"]
     assert len(llm.calls) == 1
+
+
+def test_rag_query_service_expands_adjacent_chunk_on_same_page() -> None:
+    document = Document.objects.create(
+        title="Manual",
+        source_name="manual.pdf",
+        source_type="pdf",
+        content_hash="a" * 64,
+    )
+    anchor = DocumentChunk.objects.create(
+        document=document,
+        position=0,
+        page_number=31,
+        content="Checks before commencing troubleshooting.",
+        content_hash="b" * 64,
+    )
+    adjacent = DocumentChunk.objects.create(
+        document=document,
+        position=1,
+        page_number=31,
+        content="A recommended type of paper is being used. The paper is not damp.",
+        content_hash="c" * 64,
+    )
+    DocumentChunk.objects.create(
+        document=document,
+        position=2,
+        page_number=32,
+        content="Outra pagina.",
+        content_hash="d" * 64,
+    )
+    llm = FakeLLM()
+    search_result = SearchResult(
+        chunk_id=str(anchor.id),
+        document_id=str(document.id),
+        score=0.9,
+        content=anchor.content,
+        source_name=document.source_name,
+        page_number=anchor.page_number,
+        metadata={},
+    )
+    service = RAGQueryService(
+        search_service=FakeSearchService([search_result]),
+        prompt_builder=PromptBuilder(max_context_chars=2000),
+        llm=llm,
+    )
+
+    result = service.answer("O que verificar no papel?", top_k=5)
+
+    assert str(adjacent.id) in [item["chunk_id"] for item in result["sources"]]
+    assert "recommended type of paper" in llm.calls[0][1]
+    assert "Outra pagina" not in llm.calls[0][1]
 
 
 def test_rag_query_service_does_not_call_llm_without_context() -> None:

@@ -221,9 +221,9 @@ O detalhamento, os achados da revisao e a Definition of Done estao em
 
 ### Sprint 13 - Gate de Confiabilidade
 
-Status: concluida em codigo e testes. Aplicacao da reconciliacao e certificacao
-do quality gate na base real pendentes; o dry-run identificou `1` vetor orfao
-legado, sem remocao automatica.
+Status: concluida em codigo e testes. A pendencia operacional registrada nesta
+sprint foi resolvida na Sprint 16, com reconciliacao limpa e quality gate
+aprovado na base controlada.
 
 Objetivo: impedir respostas sem contexto suficiente e aprovar integralmente o
 quality gate do RAG.
@@ -263,3 +263,19 @@ Escopo previsto:
 - Override Compose de producao com portas de dados removidas.
 - Biblioteca paginada com facets globais de fabricante/modelo.
 - Validacao automatizada de backend, frontend e perfis Compose.
+
+### Sprint 16 - Certificacao Final da Base Controlada
+
+Status: concluida. A base controlada foi indexada e reconciliada, e o quality
+gate de retrieval e geracao foi aprovado dentro da imagem containerizada.
+
+Objetivo: certificar o fluxo RAG completo com dados reais e corrigir desvios
+encontrados na avaliacao tecnica.
+
+Escopo entregue:
+
+- Base com `2` documentos, `803` chunks e `803` vetores consistentes.
+- Expansao de contexto para chunks adjacentes na mesma pagina.
+- Normalizacao de citacoes para o contrato `[Fonte N]`.
+- Backend com `85` testes aprovados.
+- Quality gate tecnico aprovado, incluindo geracao Maritaca.
