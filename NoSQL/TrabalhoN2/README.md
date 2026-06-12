@@ -234,6 +234,9 @@ docker compose exec api python manage.py check
 | `EMBEDDING_SERVICE_URL` | Endpoint interno opcional para embeddings compartilhados |
 | `EMBEDDING_SERVICE_ENABLED` | Habilita o endpoint apenas no container dedicado |
 | `EMBEDDING_SERVICE_TIMEOUT_SECONDS` | Timeout da chamada ao servico de embeddings |
+| `EMBEDDING_SERVICE_BATCH_SIZE` | Quantidade de chunks enviados por chamada ao servico de embeddings |
+| `EMBEDDING_SERVICE_MAX_RETRIES` | Retentativas por chamada ao servico de embeddings |
+| `EMBEDDING_SERVICE_RETRY_BASE_DELAY_SECONDS` | Espera base entre retentativas do servico de embeddings |
 | `QDRANT_URL` | URL HTTP do Qdrant |
 | `QDRANT_COLLECTION` | Colecao vetorial dos chunks |
 | `RAG_TOP_K` | Quantidade padrao de resultados semanticos |

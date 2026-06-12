@@ -16,3 +16,5 @@ frontend/.next/
 frontend/.env.local
 frontend/playwright-report/
 frontend/test-results/
+docs/
+

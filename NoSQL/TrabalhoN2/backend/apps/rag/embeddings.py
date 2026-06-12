@@ -1,4 +1,5 @@
 import json
+import time
 from collections.abc import Sequence
 from typing import Protocol
 from urllib.error import HTTPError, URLError
@@ -44,14 +45,26 @@ class FastEmbedProvider:
         return next(self._model.query_embed(text)).tolist()
 
 
-_REMOTE_BATCH_SIZE = 100
+_DEFAULT_REMOTE_BATCH_SIZE = 32
+_RETRYABLE_HTTP_STATUSES = {408, 429, 500, 502, 503, 504}
 
 
 class RemoteEmbeddingProvider:
-    def __init__(self, url: str, dimension: int, timeout_seconds: float) -> None:
+    def __init__(
+        self,
+        url: str,
+        dimension: int,
+        timeout_seconds: float,
+        batch_size: int = _DEFAULT_REMOTE_BATCH_SIZE,
+        max_retries: int = 1,
+        retry_base_delay_seconds: float = 1.0,
+    ) -> None:
         self._url = url
         self._dimension = dimension
         self._timeout_seconds = timeout_seconds
+        self._batch_size = max(1, batch_size)
+        self._max_retries = max(0, max_retries)
+        self._retry_base_delay_seconds = max(0.0, retry_base_delay_seconds)
 
     @property
     def dimension(self) -> int:
@@ -59,11 +72,11 @@ class RemoteEmbeddingProvider:
 
     def embed_documents(self, texts: Sequence[str]) -> list[list[float]]:
         all_texts = list(texts)
-        if len(all_texts) <= _REMOTE_BATCH_SIZE:
+        if len(all_texts) <= self._batch_size:
             return self._request("documents", all_texts)
         results: list[list[float]] = []
-        for i in range(0, len(all_texts), _REMOTE_BATCH_SIZE):
-            batch = all_texts[i : i + _REMOTE_BATCH_SIZE]
+        for i in range(0, len(all_texts), self._batch_size):
+            batch = all_texts[i : i + self._batch_size]
             results.extend(self._request("documents", batch))
         return results
 
@@ -77,12 +90,23 @@ class RemoteEmbeddingProvider:
             headers={"Content-Type": "application/json"},
             method="POST",
         )
-        try:
-            with urlopen(request, timeout=self._timeout_seconds) as response:
-                payload = json.load(response)
-        except (HTTPError, URLError, TimeoutError) as error:
-            raise RuntimeError(f"Servico de embeddings indisponivel: {error}") from error
+        for attempt in range(self._max_retries + 1):
+            try:
+                with urlopen(request, timeout=self._timeout_seconds) as response:
+                    payload = json.load(response)
+                break
+            except (HTTPError, URLError, TimeoutError) as error:
+                if attempt >= self._max_retries or not self._should_retry(error):
+                    raise RuntimeError(
+                        f"Servico de embeddings indisponivel: {error}"
+                    ) from error
+                time.sleep(self._retry_base_delay_seconds * (2**attempt))
         vectors = payload.get("vectors", [])
         if len(vectors) != len(texts):
             raise RuntimeError("Servico de embeddings retornou quantidade invalida de vetores.")
         return vectors
+
+    def _should_retry(self, error: Exception) -> bool:
+        if isinstance(error, HTTPError):
+            return error.code in _RETRYABLE_HTTP_STATUSES
+        return isinstance(error, (URLError, TimeoutError))

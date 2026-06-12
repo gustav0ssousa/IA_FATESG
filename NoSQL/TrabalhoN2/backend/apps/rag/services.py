@@ -239,6 +239,11 @@ def build_services() -> tuple[DocumentIndexingService, SemanticSearchService]:
             url=settings.EMBEDDING_SERVICE_URL,
             dimension=settings.EMBEDDING_DIMENSION,
             timeout_seconds=settings.EMBEDDING_SERVICE_TIMEOUT_SECONDS,
+            batch_size=settings.EMBEDDING_SERVICE_BATCH_SIZE,
+            max_retries=settings.EMBEDDING_SERVICE_MAX_RETRIES,
+            retry_base_delay_seconds=(
+                settings.EMBEDDING_SERVICE_RETRY_BASE_DELAY_SECONDS
+            ),
         )
     else:
         embeddings = FastEmbedProvider(
